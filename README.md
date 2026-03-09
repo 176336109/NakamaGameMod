@@ -13,16 +13,29 @@
 - **内购系统 (IapService)**：对接 Nakama 的 Apple/Google 票据校验机制，并在校验成功后触发服务器安全发货。
 - **调试工具 (DebugAddItems)**：提供在开发环境下的快捷物品发放接口。
 
-## 📦 安装方式
+## 📦 客户端安装方式 (Unity)
 
 1. **环境依赖**：
    - Unity 2021.3 或更高版本。
    - 配置项目的 `Api Compatibility Level` 为 **.NET Standard 2.1**（在 `Project Settings -> Player` 中设置）。
    - 依赖官方 **[Nakama Unity SDK](https://github.com/heroiclabs/nakama-unity)**，请确保该依赖已导入工程。
 
-2. **导入本项目**：
-   - **方式一（本地包导入 - 推荐）**：在 Unity 的 Package Manager 中点击 `+` -> `Add package from disk...`，选择本项目中 `Packages/com.nakamaservermod.unity-sdk/package.json`（如果项目结构已被整理为标准 UPM 包），或直接选择 `Assets/com.nakamaservermod.unity-sdk/package.json`。
-   - **方式二（源码置入）**：直接将 `Assets/com.nakamaservermod.unity-sdk` 文件夹拖入你当前 Unity 游戏工程的 `Assets` 或 `Packages` 目录中。
+2. **导入 Unity SDK**：
+   - **方式一（UPM Git URL 导入 - 推荐）**：打开 Unity 的 Package Manager，点击左上角 `+` -> `Add package from git URL...`，输入以下链接并等待安装完成：
+     ```text
+     https://github.com/176336109/NakamaGameMod.git?path=Assets/com.nakamaservermod.unity-sdk
+     ```
+   - **方式二（本地 UPM 包导入）**：将本项目 clone 到本地后，在 Package Manager 中点击 `+` -> `Add package from disk...`，选择本地的 `Assets/com.nakamaservermod.unity-sdk/package.json`。
+   - **方式三（源码置入）**：直接将 `Assets/com.nakamaservermod.unity-sdk` 文件夹整个拖入你目标 Unity 游戏工程的 `Assets` 目录下。
+
+## 🚀 服务端部署方式 (Nakama)
+
+本项目内置了配套的 Nakama Lua 服务器模块代码。要使 SDK 正常工作，必须先在 Nakama 服务器中部署这些模块。
+
+1. 定位到底层的 Lua 源码夹：在项目中找到 `Assets/com.nakamaservermod.unity-sdk/NakamaServerMod` 目录。
+2. 将目录下所有的 `.lua` 文件（如 `main.lua`、`gacha.lua`、`checkin.lua` 等）放入你的 Nakama 服务器的模块挂载目录 `data/modules` 内。
+3. 确保你的 Nakama 配置文件（如 `local.yml`）中正确指定了 runtime path（默认即为 `data/modules`）。
+4. 重启 Nakama 容器，查阅 Nakama 启动日志，若看到类似于 `Initialising modules` 和对应模块加载成功的信息，即表示服务端配置完毕。
 
 ## 🔄 基本逻辑时序
 
