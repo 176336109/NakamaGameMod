@@ -1,0 +1,16 @@
+{
+    "name": "NakamaServerMod.UnitySdk.Runtime",
+    "rootNamespace": "NakamaServerMod.UnitySdk",
+    "references": [
+        "NakamaRuntime"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

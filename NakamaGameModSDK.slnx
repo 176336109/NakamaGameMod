@@ -1,0 +1,8 @@
+﻿<Solution>
+  <Project Path="NakamaServerMod.UnitySdk.Runtime.csproj" />
+  <Project Path="NakamaEditor.csproj" />
+  <Project Path="Assembly-CSharp-Editor.csproj" />
+  <Project Path="NakamaServerMod.UnitySdk.Test.csproj" />
+  <Project Path="NakamaRuntime.csproj" />
+  <Project Path="Assembly-CSharp.csproj" />
+</Solution>
