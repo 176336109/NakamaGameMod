@@ -29,12 +29,12 @@
 - CHECKIN_NOT_PENDING_BONUS：尝试补领奖的那天不是 pending_bonus 状态。
 - CHECKIN_GATE_NOT_MET：补领奖时门槛等级不足（仍未达标）。
 - CHECKIN_CONFIG_ERROR：配置缺失/格式错误（奖励表或补签消耗配置不合法）。
-- CHECKIN_GRANT_FAILED：发放奖励失败（inventory.add_items 返回失败）。
+- CHECKIN_GRANT_FAILED：发放奖励失败（backpack.add_items 返回失败）。
 --]]
 
 local nk = require("nakama")
 local config = require("config")
-local inventory = require("inventory")
+local backpack = require("backpack")
 
 local M = {}
 
@@ -445,7 +445,7 @@ end
 -- 1) 读取/整理状态并计算今天 day_id（跨天基于 UTC）。
 -- 2) 校验今天是否可领：只能在 "Claimable" 状态领取。
 -- 3) 读取奖励配置并计算倍率：门槛达标则一次性发 2 倍；未达标先发 1 倍并标记 pending_bonus。
--- 4) 调用 inventory.add_items 发放奖励；成功后更新状态并落库。
+-- 4) 调用 backpack.add_items 发放奖励；成功后更新状态并落库。
 -- 5) 若为第 28 天则重置周期到“明天开始的下一周期”。
 function M.rpc_daily_checkin(context, payload)
     local user_id = context.user_id
@@ -487,7 +487,7 @@ function M.rpc_daily_checkin(context, payload)
     local multiplier = meets and 2 or 1
     local rewards = build_items(reward.item_id, reward.num * multiplier)
 
-    local ok, err = inventory.add_items(context, user_id, rewards, "checkin", {
+    local ok, err = backpack.add_items(context, user_id, rewards, "checkin", {
         gating_mode = gating_mode,
         required_level = reward.required_level,
         player_level = player_level,
@@ -538,7 +538,7 @@ end
 
 -- RPC：补签流程（补签某个 missed 的历史日）：
 -- 1) 校验 day_id 合法且该日对外状态为 "Missed"。
--- 2) 扣除补签消耗（inventory.consume_items）。
+-- 2) 扣除补签消耗（backpack.consume_items）。
 -- 3) 发放该日奖励：门槛达标发 2 倍；未达标发 1 倍并标记 pending_bonus（后续可补领奖 1 倍）。
 -- 4) 更新状态并落库；若补签的是第 28 天则同样触发周期重置。
 function M.rpc_checkin_makeup(context, payload)
@@ -591,7 +591,7 @@ function M.rpc_checkin_makeup(context, payload)
         cycle_no = state.cycle_no
     }
 
-    local ok_cost, err_cost = inventory.consume_items(context, user_id, build_items(cost_item, cost_num), "makeup", log_ref)
+    local ok_cost, err_cost = backpack.consume_items(context, user_id, build_items(cost_item, cost_num), "makeup", log_ref)
     if not ok_cost then
         return make_error("CHECKIN_INSUFFICIENT_COST", err_cost or "Insufficient cost")
     end
@@ -599,7 +599,7 @@ function M.rpc_checkin_makeup(context, payload)
     local meets = player_level >= reward.required_level
     local multiplier = meets and 2 or 1
     local rewards = build_items(reward.item_id, reward.num * multiplier)
-    local ok_grant, err_grant = inventory.add_items(context, user_id, rewards, "makeup", log_ref)
+    local ok_grant, err_grant = backpack.add_items(context, user_id, rewards, "makeup", log_ref)
     if not ok_grant then
         return make_error("CHECKIN_GRANT_FAILED", err_grant or "Grant rewards failed")
     end
@@ -669,7 +669,7 @@ function M.rpc_checkin_claim_bonus(context, payload)
     end
 
     local rewards = build_items(reward.item_id, reward.num)
-    local ok_grant, err_grant = inventory.add_items(context, user_id, rewards, "checkin_bonus", {
+    local ok_grant, err_grant = backpack.add_items(context, user_id, rewards, "checkin_bonus", {
         gating_mode = gating_mode,
         required_level = reward.required_level,
         player_level = player_level,

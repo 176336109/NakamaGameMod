@@ -11,7 +11,7 @@
 ]]
 local nk = require("nakama")
 local config = require("config")
-local inventory = require("inventory")
+local backpack = require("backpack")
 
 local M = {}
 
@@ -19,7 +19,7 @@ local M = {}
 function M.on_purchase_complete(context, purchase)
     -- context.user_id：购买用户
     -- purchase.product_id：商品 ID（用于查找配置与发货）
-    -- purchase.provider/store/transaction_id/environment：对账/追踪字段（会写入 ref 交给 inventory 侧使用）
+    -- purchase.provider/store/transaction_id/environment：对账/追踪字段（会写入 ref 交给 backpack 侧使用）
     local user_id = context.user_id
     local product_id = purchase.product_id
     
@@ -33,17 +33,17 @@ function M.on_purchase_complete(context, purchase)
     end
     
     -- 发放奖励：按配置表 iap_products[product_id].rewards 进行道具/货币等增发
-    -- ref：作为“幂等/对账”上下文，尽量带齐交易来源字段（inventory 模块可据此做审计或二次幂等）
+    -- ref：作为“幂等/对账”上下文，尽量带齐交易来源字段（backpack 模块可据此做审计或二次幂等）
     if product_config.rewards then
         local ref = { product_id = product_id }
         if purchase.provider ~= nil then ref.provider = purchase.provider end
         if purchase.store ~= nil then ref.store = purchase.store end
         if purchase.transaction_id ~= nil then ref.transaction_id = purchase.transaction_id end
         if purchase.environment ~= nil then ref.environment = purchase.environment end
-        local ok, err = inventory.add_items(context, user_id, product_config.rewards, "iap", ref)
+        local ok, err = backpack.add_items(context, user_id, product_config.rewards, "iap", ref)
         if not ok then
             -- 异常分支：发货失败，拒绝提交该笔交易，避免出现“交易记录已写入但未发货”的不一致
-            -- 日志字段语义：tostring(err) 由 inventory 返回，通常包含失败原因/堆栈/下游错误描述
+            -- 日志字段语义：tostring(err) 由 backpack 返回，通常包含失败原因/堆栈/下游错误描述
             nk.logger_error("Failed to grant purchase rewards: " .. tostring(err))
             return false
         end

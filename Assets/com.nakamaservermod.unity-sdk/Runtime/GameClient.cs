@@ -65,6 +65,31 @@ namespace NakamaServerMod.UnitySdk
             }
         }
 
+        public async Task<IApiAccount> GetAccountAsync(CancellationToken cancellationToken = default)
+        {
+            if (Session == null)
+            {
+                throw SdkException.InvalidSession();
+            }
+
+            try
+            {
+                return await Client.GetAccountAsync(Session, retryConfiguration: null, canceller: cancellationToken);
+            }
+            catch (ApiResponseException ex)
+            {
+                throw SdkException.Api(ex.Message, ex, statusCode: (int)ex.StatusCode);
+            }
+            catch (TaskCanceledException ex)
+            {
+                throw SdkException.Network("GetAccountAsync cancelled.", ex);
+            }
+            catch (Exception ex)
+            {
+                throw SdkException.Unexpected("GetAccountAsync failed.", ex);
+            }
+        }
+
         public Task<TResponse> RpcAsync<TResponse>(string rpcId, CancellationToken cancellationToken = default)
         {
             return RpcAsync<string, TResponse>(rpcId, null, cancellationToken);

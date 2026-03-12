@@ -25,6 +25,11 @@ M.items = {
     ["gold"] = { type = "currency", name = "Gold Coin" },
     ["gem"] = { type = "currency", name = "Gem" },
     ["energy"] = { type = "currency", name = "Energy" },
+    ["item_diamond"] = { type = "currency", name = "Diamond" },
+    ["item_gold"] = { type = "currency", name = "Gold Coin" },
+    ["item_hourglass"] = { type = "item", name = "Hourglass", max_stack = 9999 },
+    ["item_vip_active"] = { type = "time_limited", name = "VIP Monthly Card", max_stack = 1 },
+    ["item_svip_active"] = { type = "time_limited", name = "SVIP Monthly Card", max_stack = 1 },
     ["exp_potion"] = { type = "item", name = "EXP Potion", max_stack = 999 },
     ["hero_ssr_001"] = { type = "hero", name = "SSR Knight", rarity = "SSR" },
     ["hero_sr_001"] = { type = "hero", name = "SR Archer", rarity = "SR" },
@@ -49,6 +54,43 @@ M.gacha = {
         },
         pity_ssr = 90,
         pity_sr = 10,
+    }
+}
+
+-- 权益配置（月卡奖励、特权等）
+M.benefit_plans = {
+    ["vip_monthly"] = {
+        id = "vip_monthly",
+        immediateItems = { { id = "item_diamond", count = 180 } },
+        dailyItems = { { id = "item_diamond", count = 30 } },
+        privileges = {
+            reviveLimit = 4,
+            reviveNeedsAd = true,
+            sweepLimit = 5,
+            queueExtraEnabled = false,
+            magnetNeedsAd = false,
+            plunderBaseLimit = 1,
+            plunderAdLimit = 1,
+            svipBadgeEnabled = false
+        }
+    },
+    ["svip_monthly"] = {
+        id = "svip_monthly",
+        immediateItems = { { id = "item_diamond", count = 300 } },
+        dailyItems = {
+            { id = "item_diamond", count = 60 },
+            { id = "item_hourglass", count = 3 }
+        },
+        privileges = {
+            reviveLimit = 3,
+            reviveNeedsAd = false,
+            sweepLimit = 50,
+            queueExtraEnabled = true,
+            magnetNeedsAd = true,
+            plunderBaseLimit = 2,
+            plunderAdLimit = 1,
+            svipBadgeEnabled = true
+        }
     }
 }
 
@@ -135,7 +177,13 @@ M.iap_products = {
     },
     ["com.game.monthly_card"] = {
         rewards = { { id = "gem", count = 300 } },
-        duration_days = 30
+        duration_days = 30,
+        benefit_plan_id = "vip_monthly"
+    },
+    ["com.game.svip_monthly_card"] = {
+        rewards = { { id = "gem", count = 300 } },
+        duration_days = 30,
+        benefit_plan_id = "svip_monthly"
     }
 }
 
