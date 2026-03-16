@@ -20,6 +20,14 @@
    - 配置项目的 `Api Compatibility Level` 为 **.NET Standard 2.1**（在 `Project Settings -> Player` 中设置）。
    - 依赖官方 **[Nakama Unity SDK](https://github.com/heroiclabs/nakama-unity)**，请确保该依赖已导入工程。
 
+### Unity 工程文件说明
+
+仓库中的 [NakamaGameModSDK.slnx](NakamaGameModSDK.slnx) 仅作为工作区占位解决方案保留，不直接引用 Unity 生成的 `.csproj` 文件。
+
+原因是 `Assembly-CSharp.csproj`、`NakamaRuntime.csproj` 这类项目文件由 Unity 在本地打开工程后生成，且已被 `.gitignore` 忽略；如果把它们静态写入解决方案，干净检出的仓库会在 `dotnet restore` 时直接报“未找到项目文件”。
+
+如果你需要本地的 C# 工程文件，请直接用 Unity 打开项目，并在编辑器里重新生成项目文件。
+
 2. **导入 Unity SDK**：
    - **方式一（UPM Git URL 导入 - 推荐）**：打开 Unity 的 Package Manager，点击左上角 `+` -> `Add package from git URL...`，输入以下链接并等待安装完成：
      ```text
