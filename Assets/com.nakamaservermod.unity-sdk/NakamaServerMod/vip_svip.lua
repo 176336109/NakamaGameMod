@@ -37,9 +37,22 @@ vip_svip.lua
 
 local nk = require("nakama")
 local config = require("config")
-local backpack = require("backpack")
 
 local M = {}
+local item_gateway = {
+    add_items = function()
+        return false, "item gateway not configured"
+    end
+}
+
+function M.set_item_gateway(gateway)
+    if type(gateway) ~= "table" then
+        return
+    end
+    if type(gateway.add_items) == "function" then
+        item_gateway.add_items = gateway.add_items
+    end
+end
 
 -- 常量定义
 local VIP_ITEM_ID = "item_vip_active"
@@ -49,6 +62,21 @@ local SVIP_PLAN_ID = "svip_monthly"
 
 local MAX_CUMULATIVE_DAYS = 180
 local MAX_PENDING_DAYS = 3
+
+local function is_item_expired(item_data)
+    if not item_data then return true end
+    local now = os.time()
+    return item_data.expireAt and now > item_data.expireAt
+end
+
+local function get_remaining_days(item_data)
+    if not item_data or is_item_expired(item_data) then
+        return 0
+    end
+    local now = os.time()
+    local remaining_seconds = item_data.expireAt - now
+    return math.ceil(remaining_seconds / (24 * 60 * 60))
+end
 
 -- 获取今日日期 Key (用于日切)
 local function get_today_key()
@@ -181,8 +209,8 @@ local function get_user_privileges(user_id)
         if obj.key == SVIP_ITEM_ID then svip_item = obj.value end
     end
     
-    local vip_active = vip_item and not backpack.is_item_expired(vip_item)
-    local svip_active = svip_item and not backpack.is_item_expired(svip_item)
+    local vip_active = vip_item and not is_item_expired(vip_item)
+    local svip_active = svip_item and not is_item_expired(svip_item)
     
     -- 默认特权 (免费玩家)
     local priv = {
@@ -246,7 +274,7 @@ local function purchase_subscription(context, user_id, item_id, plan_id, duratio
         item_data = existing_item.value
         item_version = existing_item.version
         
-        if backpack.is_item_expired(item_data) then
+        if is_item_expired(item_data) then
             -- 过期重置
             item_data.startAt = now
             item_data.expireAt = now + (duration_days * 86400)
@@ -332,7 +360,7 @@ local function purchase_subscription(context, user_id, item_id, plan_id, duratio
     
     -- 3. 发放立即奖励 (普通物品，通过 inventory 模块)
     if plan_config.immediateItems and #plan_config.immediateItems > 0 then
-        backpack.add_items(context, user_id, plan_config.immediateItems, log_source, { planId = plan_id, type = "purchase" })
+        item_gateway.add_items(context, user_id, plan_config.immediateItems, log_source, { planId = plan_id, type = "purchase" })
     end
     
     return true, item_data
@@ -355,7 +383,7 @@ local function claim_daily_reward(context, user_id, item_id, plan_id, log_source
         if obj.key == plan_id then state_obj = obj end
     end
     
-    if not item_obj or not item_obj.value or backpack.is_item_expired(item_obj.value) then
+    if not item_obj or not item_obj.value or is_item_expired(item_obj.value) then
         return false, "Subscription not active or expired"
     end
     
@@ -393,7 +421,7 @@ local function claim_daily_reward(context, user_id, item_id, plan_id, log_source
     -- 3. 发放奖励
     local plan_config = config.benefit_plans[plan_id]
     if plan_config and plan_config.dailyItems then
-        local success, err = backpack.add_items(context, user_id, plan_config.dailyItems, log_source, { planId = plan_id, type = "daily_claim" })
+        local success, err = item_gateway.add_items(context, user_id, plan_config.dailyItems, log_source, { planId = plan_id, type = "daily_claim" })
         if not success then return false, err end
     end
     
@@ -471,10 +499,10 @@ function M.get_vip_status(context, user_id)
     local svip_state, _ = get_and_refresh_subscription_state(user_id, SVIP_PLAN_ID, svip_item and svip_item.expireAt)
     
     return {
-        vip_active = vip_item and not backpack.is_item_expired(vip_item) or false,
-        svip_active = svip_item and not backpack.is_item_expired(svip_item) or false,
-        vip_remaining_days = vip_item and backpack.get_remaining_days(vip_item) or 0,
-        svip_remaining_days = svip_item and backpack.get_remaining_days(svip_item) or 0,
+        vip_active = vip_item and not is_item_expired(vip_item) or false,
+        svip_active = svip_item and not is_item_expired(svip_item) or false,
+        vip_remaining_days = vip_item and get_remaining_days(vip_item) or 0,
+        svip_remaining_days = svip_item and get_remaining_days(svip_item) or 0,
         vip_unclaimed_days = vip_state and vip_state.pendingClaimDays or 0,
         svip_unclaimed_days = svip_state and svip_state.pendingClaimDays or 0
     }
@@ -575,32 +603,22 @@ function M.check_queue_permission(context, user_id)
     }
 end
 
--- RPC: 模拟 IAP 购买流程（跳过验证，直接发货并记录日志）
--- 注意：此接口仅供开发/测试阶段使用，生产环境应禁用或严格限制权限
-function M.rpc_debug_simulate_purchase(context, payload)
-    local user_id = context.user_id
-    local req = nk.json_decode(payload)
-    
-    local plan_id = req.plan_id
+function M.debug_simulate_purchase(context, user_id, plan_id)
     if not plan_id or (plan_id ~= VIP_PLAN_ID and plan_id ~= SVIP_PLAN_ID) then
-        return nk.json_encode({ error = "Invalid plan_id. Must be 'vip_monthly' or 'svip_monthly'" })
+        return false, "Invalid plan_id. Must be 'vip_monthly' or 'svip_monthly'"
     end
     
     local item_id = (plan_id == VIP_PLAN_ID) and VIP_ITEM_ID or SVIP_ITEM_ID
     local log_source = (plan_id == VIP_PLAN_ID) and "购买VIP" or "购买SVIP"
     local duration_days = 30
     
-    -- 1. 模拟 IAP 验证通过（实际项目中这里应调用 nk.purchase_validate_* 或第三方验证）
     nk.logger_info(string.format("Simulating purchase validation for user %s, plan %s", user_id, plan_id))
     
-    -- 2. 执行发货逻辑
     local success, result = purchase_subscription(context, user_id, item_id, plan_id, duration_days, log_source)
     if not success then
-        return nk.json_encode({ error = result })
+        return false, result
     end
     
-    -- 3. 记录模拟的购买日志到 Storage (collection="purchase_history")
-    -- 这替代了 Payments 表的功能，供您在 Storage 页面查看记录
     local plan_config = config.benefit_plans[plan_id]
     local price = plan_config and plan_config.price or 0
     local currency = plan_config and plan_config.currency or "UNKNOWN"
@@ -626,96 +644,12 @@ function M.rpc_debug_simulate_purchase(context, payload)
         permission_write = 0
     }})
     
-    return nk.json_encode({ 
-        success = true, 
+    return true, {
+        success = true,
         message = "Purchase simulated successfully",
         item_data = result,
         transaction_id = purchase_record.transaction_id
-    })
-end
-
--- RPC Wrappers (unchanged interface, just calling new logic)
-function M.rpc_purchase_vip(context, payload)
-    local req = {}
-    if payload and payload ~= "" then
-        pcall(function() req = nk.json_decode(payload) end)
-    end
-    
-    local days = req.days or 30
-    local s, r = M.purchase_vip(context, context.user_id, days)
-    if not s then return nk.json_encode({error=r}) end
-    -- Wrap result in table to match Unity side expectations
-    -- purchase_subscription returns (true, item_data)
-    -- So we need to return {success=true, item_data=item_data}
-    return nk.json_encode({success=true, item_data=r})
-end
-
-function M.rpc_purchase_svip(context, payload)
-    local req = {}
-    if payload and payload ~= "" then
-        pcall(function() req = nk.json_decode(payload) end)
-    end
-    
-    local days = req.days or 30
-    local s, r = M.purchase_svip(context, context.user_id, days)
-    if not s then return nk.json_encode({error=r}) end
-    return nk.json_encode({success=true, item_data=r})
-end
-
-function M.rpc_claim_vip_daily(context, payload)
-    local s, r = M.claim_vip_daily(context, context.user_id)
-    if not s then return nk.json_encode({error=r}) end
-    return nk.json_encode({success=true})
-end
-
-function M.rpc_claim_svip_daily(context, payload)
-    local s, r = M.claim_svip_daily(context, context.user_id)
-    if not s then return nk.json_encode({error=r}) end
-    return nk.json_encode({success=true})
-end
-
-function M.rpc_claim_all_daily(context, payload)
-    local s, r = M.claim_all_daily(context, context.user_id)
-    if not s then return nk.json_encode({error=r}) end
-    return nk.json_encode({success=true})
-end
-
-function M.rpc_get_vip_status(context, payload)
-    return nk.json_encode(M.get_vip_status(context, context.user_id))
-end
-
-function M.rpc_check_revive_permission(context, payload)
-    return nk.json_encode(M.check_revive_permission(context, context.user_id))
-end
-
-function M.rpc_record_revive_usage(context, payload)
-    local req = nk.json_decode(payload)
-    return nk.json_encode({success=M.record_revive_usage(context, context.user_id, req.used_ad)})
-end
-
-function M.rpc_check_sweep_permission(context, payload)
-    return nk.json_encode(M.check_sweep_permission(context, context.user_id))
-end
-
-function M.rpc_record_sweep_usage(context, payload)
-    return nk.json_encode({success=M.record_sweep_usage(context, context.user_id)})
-end
-
-function M.rpc_check_magnet_permission(context, payload)
-    return nk.json_encode(M.check_magnet_permission(context, context.user_id))
-end
-
-function M.rpc_check_plunder_permission(context, payload)
-    return nk.json_encode(M.check_plunder_permission(context, context.user_id))
-end
-
-function M.rpc_record_plunder_usage(context, payload)
-    local req = nk.json_decode(payload)
-    return nk.json_encode({success=M.record_plunder_usage(context, context.user_id, req.is_ad)})
-end
-
-function M.rpc_check_queue_permission(context, payload)
-    return nk.json_encode(M.check_queue_permission(context, context.user_id))
+    }
 end
 
 return M

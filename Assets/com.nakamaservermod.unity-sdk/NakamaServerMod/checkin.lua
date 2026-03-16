@@ -1,6 +1,5 @@
 local nk = require("nakama")
 local config = require("config")
-local backpack = require("backpack")
 
 local M = {}
 
@@ -133,29 +132,21 @@ local function normalize_items(items)
     return out
 end
 
--- RPC: Get Check-in State
-function M.rpc_checkin_get_state(context, payload)
-    local user_id = context.user_id
-    local cycle_no, cycle_day, current_day_idx = get_cycle_info(user_id)
+function M.get_state_data(user_id)
+    local cycle_no, cycle_day = get_cycle_info(user_id)
     local cycle_id_str = "C" .. tostring(cycle_no)
-    
-    local state, version = load_state(user_id)
-    
-    -- Reset state if cycle mismatch (new cycle started)
+    local state = load_state(user_id)
     if not state.cycleId or state.cycleId ~= cycle_id_str then
         state = reset_cycle_state(cycle_id_str, state)
     end
-    
+
     local days_info = {}
     local checkin_cfg = config.checkin or {}
     local rewards_cfg = checkin_cfg.rewards or {}
-    
     for i = 1, 7 do
         local status = "locked"
         local saved_day_data = state.days[tostring(i)]
-        
         if saved_day_data then
-            -- Already signed or makeup_signed
             if saved_day_data.status == "makeup_signed" then
                 status = "makeup_signed"
             else
@@ -170,190 +161,40 @@ function M.rpc_checkin_get_state(context, payload)
                 status = "locked"
             end
         end
-        
         local reward = normalize_items(rewards_cfg[i] or {})
-        
-        table.insert(days_info, {
-            day_index = i,
-            status = status,
-            rewards = reward
-        })
+        table.insert(days_info, { day_index = i, status = status, rewards = reward })
     end
-    
+
     local makeup_cost_cfg = checkin_cfg.makeup_cost
     local makeup_cost_resp = nil
     if makeup_cost_cfg then
-        makeup_cost_resp = {
-            id = makeup_cost_cfg.item_id,
-            count = makeup_cost_cfg.count
-        }
+        makeup_cost_resp = { id = makeup_cost_cfg.item_id, count = makeup_cost_cfg.count }
     end
-    
-    return nk.json_encode({
+
+    return {
         cycle_no = cycle_no,
         current_cycle_day = cycle_day,
         days = days_info,
         makeup_cost = makeup_cost_resp,
         timestamp = os.time()
-    })
-end
-
--- RPC: Daily Check-in
-function M.rpc_daily_checkin(context, payload)
-    local user_id = context.user_id
-    local cycle_no, cycle_day, current_day_idx = get_cycle_info(user_id)
-    local cycle_id_str = "C" .. tostring(cycle_no)
-    
-    local state, version = load_state(user_id)
-    
-    -- Reset/Init if needed
-    if not state.cycleId or state.cycleId ~= cycle_id_str then
-        state = reset_cycle_state(cycle_id_str, state)
-    end
-    
-    local day_str = tostring(cycle_day)
-    
-    if state.days[day_str] then
-        return make_error("CHECKIN_ALREADY_CLAIMED", "Already checked in today")
-    end
-    
-    -- Grant Rewards
-    local checkin_cfg = config.checkin or {}
-    local rewards = normalize_items((checkin_cfg.rewards or {})[cycle_day])
-    
-    if #rewards == 0 then
-        return make_error("CHECKIN_CONFIG_ERROR", "No rewards config for today")
-    end
-    
-    -- Backpack add items
-    local success, err = backpack.add_items(context, user_id, rewards, "daily_checkin", {
-        cycle_no = cycle_no,
-        day_index = cycle_day
-    })
-    
-    if not success then
-        return make_error("CHECKIN_GRANT_FAILED", err)
-    end
-    
-    -- Update State
-    state.days[day_str] = {
-        status = "signed",
-        claimAt = os.time(),
-        claimType = "normal"
     }
-    save_state(user_id, state, version)
-    
-    return nk.json_encode({
-        success = true,
-        rewards = rewards,
-        day_index = cycle_day,
-        status = "signed"
-    })
 end
 
--- RPC: Makeup Check-in
-function M.rpc_checkin_makeup(context, payload)
-    local user_id = context.user_id
-    local req = nk.json_decode(payload)
-    local target_day = req.day_index -- 1 to 7
-    
-    if not target_day or target_day < 1 or target_day > 7 then
-        return make_error("CHECKIN_INVALID_PARAM", "Invalid day index")
-    end
-    
-    local cycle_no, cycle_day, current_day_idx = get_cycle_info(user_id)
-    local cycle_id_str = "C" .. tostring(cycle_no)
-    
-    if target_day >= cycle_day then
-        return make_error("CHECKIN_INVALID_ACTION", "Cannot makeup for today or future")
-    end
-    
-    local state, version = load_state(user_id)
-    
-    -- Check cycle
-    if not state.cycleId or state.cycleId ~= cycle_id_str then
-        state = reset_cycle_state(cycle_id_str, state)
-    end
-    
-    local day_str = tostring(target_day)
-    if state.days[day_str] then
-        return make_error("CHECKIN_ALREADY_CLAIMED", "Day already signed")
-    end
-    
-    -- Check Cost
-    local checkin_cfg = config.checkin or {}
-    local cost = checkin_cfg.makeup_cost
-    if not cost then
-        return make_error("CHECKIN_CONFIG_ERROR", "Makeup cost not configured")
-    end
-    
-    -- Deduct Cost
-    local consume_items = normalize_items({ { id = cost.id, item_id = cost.item_id, count = cost.count } })
-    if #consume_items == 0 then
-        return make_error("CHECKIN_CONFIG_ERROR", "Invalid makeup cost config")
-    end
-    local success_cost, err_cost = backpack.consume_items(context, user_id, consume_items, "checkin_makeup_cost", {
-        cycle_no = cycle_no,
-        target_day = target_day
-    })
-    
-    if not success_cost then
-        return make_error("CHECKIN_INSUFFICIENT_COST", "Insufficient crystals")
-    end
-    
-    -- Grant Rewards
-    local rewards = normalize_items((checkin_cfg.rewards or {})[target_day])
-    if #rewards == 0 then
-         -- Rollback cost? Nakama doesn't support transaction rollback easily across multiple calls if not using wallet update directly.
-         -- But here backpack uses storage. 
-         -- Ideally we should check rewards config first. We did above.
-         -- But if add_items fails...
-         -- We should try to refund.
-         backpack.add_items(context, user_id, consume_items, "checkin_makeup_refund", {})
-         return make_error("CHECKIN_CONFIG_ERROR", "No rewards config")
-    end
-    
-    local success_grant, err_grant = backpack.add_items(context, user_id, rewards, "checkin_makeup_reward", {
-        cycle_no = cycle_no,
-        target_day = target_day
-    })
-    
-    if not success_grant then
-        -- Refund cost
-        backpack.add_items(context, user_id, consume_items, "checkin_makeup_refund", {})
-        return make_error("CHECKIN_GRANT_FAILED", err_grant)
-    end
-    
-    -- Update State
-    state.days[day_str] = {
-        status = "makeup_signed",
-        claimAt = os.time(),
-        claimType = "makeup"
-    }
-    save_state(user_id, state, version)
-    
-    return nk.json_encode({
-        success = true,
-        rewards = rewards,
-        day_index = target_day,
-        status = "makeup_signed"
-    })
-end
-
--- DEBUG RPC: Set time offset
-function M.rpc_debug_set_time_offset(context, payload)
-    local user_id = context.user_id
-    local req = nk.json_decode(payload)
-    local offset = tonumber(req.offset) or 0
-
+function M.set_time_offset(user_id, offset)
     local state, version = load_state(user_id)
     if type(state) ~= "table" then
         state = {}
     end
-    state.time_offset = offset
+    state.time_offset = tonumber(offset) or 0
     save_state(user_id, state, version)
-
-    return nk.json_encode({ success = true, offset = offset })
+    return state.time_offset
 end
+
+M.make_error = make_error
+M.get_cycle_info = get_cycle_info
+M.load_state = load_state
+M.save_state = save_state
+M.reset_cycle_state = reset_cycle_state
+M.normalize_items = normalize_items
 
 return M
