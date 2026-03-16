@@ -12,7 +12,6 @@
 local nk = require("nakama")
 local config = require("config")
 local backpack = require("domain.backpack")
-
 local M = {}
 
 -- 发货主流程：在平台校验通过后执行，负责道具/权益发放与订阅状态写入
