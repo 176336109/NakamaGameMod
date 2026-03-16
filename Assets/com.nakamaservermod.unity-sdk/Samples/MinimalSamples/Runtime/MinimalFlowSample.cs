@@ -69,7 +69,7 @@ public sealed class MinimalFlowSample : MonoBehaviour
 
         var checkinService = new CheckinService(client);
         var checkin = await checkinService.DailyCheckinAsync(cancellationToken);
-        Debug.Log($"DailyCheckin => success={checkin?.success} streak={checkin?.streak} vip_level={checkin?.vip_level}");
+        Debug.Log($"DailyCheckin => success={checkin?.success} day_index={checkin?.day_index}");
 
         var gachaService = new GachaService(client);
         var pull = await gachaService.GachaPullAsync(bannerId, Mathf.Max(1, gachaCount), cancellationToken);

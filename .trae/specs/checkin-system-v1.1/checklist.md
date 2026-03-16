@@ -1,0 +1,11 @@
+- [x] `config.lua` contains the correct reward table and 20 gem makeup cost.
+- [x] `checkin.lua` correctly calculates cycle/day index based on account creation time.
+- [x] `checkin.lua` supports state persistence with `cycleId` and day status.
+- [x] `checkin.lua` implements `rpc_checkin_get_state` returning `signed`, `missed`, `claimable`, `locked`.
+- [x] `checkin.lua` implements `rpc_daily_checkin` logic for "today".
+- [x] `checkin.lua` implements `rpc_checkin_makeup` logic for past days with cost.
+- [x] `main.lua` registers all 4 checkin RPCs.
+- [x] `CheckinServiceTests.cs` uses Chinese usernames (`C01_新账号...`).
+- [x] `CheckinServiceTests.cs` includes C01-C12 and B01-B16 test cases.
+- [x] Each test case has Chinese comments for steps and a final result verification block.
+- [x] All tests pass without "RPC cancelled" error.

@@ -2,12 +2,12 @@
 inventory.lua
 
 职责：
-- 提供“背包/货币”的统一读写入口：货币走 Nakama Wallet；非货币物品走 Storage(collection="inventory")。
+- 提供“背包/货币”的统一读写入口：货币走 Nakama Wallet；非货币物品走 Storage(collection="backpack")。
 - 封装物品增减（加物品/消耗物品）的读写与一致性策略，并在必要时写入变更流水(collection="inventory_log")。
 - 对外暴露一组 RPC：查询钱包、查询指定物品数量、列出背包、查询变更流水（带权限控制）。
 
 数据约定：
-- Storage(collection="inventory", key=item_id, user_id=玩家) 的 value 形如：
+- Storage(collection="backpack", key=item_id, user_id=玩家) 的 value 形如：
   - count: number，数量（可为 0；写入时会直接覆盖/更新）
   - type: string，物品类型（来自 config.items[item_id].type）
 - Wallet：仅用于 config.items[item_id].type == "currency" 的条目，余额由 nk.wallet_update 原子更新。
@@ -15,7 +15,7 @@ inventory.lua
 一致性/权限要点：
 - Wallet 更新通过 nk.wallet_update(..., check=true) 在服务端做“余额不足”原子校验。
 - Storage 更新使用 version 做乐观并发控制；加物品会在冲突时重读并重试一次。
-- inventory 对象 permission_read=1、permission_write=1（当前实现允许客户端读写同用户记录；如需更严可在外层 RPC/服务端逻辑限制）。
+- backpack 对象 permission_read=1、permission_write=1（当前实现允许客户端读写同用户记录；如需更严可在外层 RPC/服务端逻辑限制）。
 - inventory_log 对象 permission_read=1、permission_write=0（仅服务端写；客户端可读同用户日志，跨用户需管理员权限）。
 ]]
 
@@ -177,65 +177,107 @@ function M.add_items(context, user_id, items_to_add, log_source, log_ref)
 
     -- 写入 Wallet（货币）
     if wallet_updated then
-        local metadata = { source = "game_logic" }
+        local metadata = { source = log_source or "game_logic" }
         nk.wallet_update(user_id, wallet_changes, metadata, true)
     end
 
     -- 写入 Storage（非货币背包）
     if next(storage_adds) ~= nil then
-        local storage_reads = {}
-        for item_id, _ in pairs(storage_adds) do
-            table.insert(storage_reads, { collection = "inventory", key = item_id, user_id = user_id })
-        end
-
-        local function build_storage_writes(objects)
-            local current_counts = {}
-            local versions = {}
-            local current_types = {}
-
-            for _, obj in ipairs(objects) do
-                current_counts[obj.key] = (obj.value and obj.value.count) or 0
-                versions[obj.key] = obj.version
-                current_types[obj.key] = (obj.value and obj.value.type) or storage_types[obj.key]
+        -- 区分特殊物品（单独存）和普通物品（存 normalItem）
+        local SPECIAL_ITEMS = { ["item_vip_active"] = true, ["item_svip_active"] = true }
+        
+        -- 1. 处理特殊物品 (单独存)
+        local special_adds = {}
+        for id, count in pairs(storage_adds) do
+            if SPECIAL_ITEMS[id] then
+                special_adds[id] = count
             end
-
+        end
+        
+        if next(special_adds) ~= nil then
+            local special_reads = {}
+            for item_id, _ in pairs(special_adds) do
+                table.insert(special_reads, { collection = "backpack", key = item_id, user_id = user_id })
+            end
+            
+            local objects = nk.storage_read(special_reads)
             local writes = {}
-            for item_id, add_count in pairs(storage_adds) do
-                local new_count = (current_counts[item_id] or 0) + add_count
+            
+            for _, obj in ipairs(objects) do
+                local item_id = obj.key
+                local count = special_adds[item_id]
+                if count then
+                    local current = (obj.value and obj.value.count) or 0
+                    table.insert(writes, {
+                        collection = "backpack",
+                        key = item_id,
+                        user_id = user_id,
+                        value = { count = current + count, type = (obj.value and obj.value.type) or storage_types[item_id] },
+                        version = obj.version,
+                        permission_read = 1,
+                        permission_write = 1
+                    })
+                    special_adds[item_id] = nil
+                end
+            end
+            
+            -- 新增的特殊物品
+            for item_id, count in pairs(special_adds) do
                 table.insert(writes, {
-                    collection = "inventory",
+                    collection = "backpack",
                     key = item_id,
                     user_id = user_id,
-                    value = { count = new_count, type = current_types[item_id] or storage_types[item_id] },
-                    version = versions[item_id],
+                    value = { count = count, type = storage_types[item_id] },
                     permission_read = 1,
                     permission_write = 1
                 })
             end
-
-            return writes
-        end
-
-        local objects = nk.storage_read(storage_reads)
-        local storage_writes = build_storage_writes(objects)
-
-        local ok, err = pcall(nk.storage_write, storage_writes)
-        if not ok then
-            -- 典型原因：version 冲突（并发写）；此处重读再重算一次写入
-            objects = nk.storage_read(storage_reads)
-            storage_writes = build_storage_writes(objects)
-            ok, err = pcall(nk.storage_write, storage_writes)
-            if not ok then
-                return false, tostring(err)
+            
+            if #writes > 0 then
+                nk.storage_write(writes)
             end
+        end
+        
+        -- 2. 处理普通物品 (合并存 normalItem)
+        local normal_adds = {}
+        for id, count in pairs(storage_adds) do
+            if not SPECIAL_ITEMS[id] then
+                normal_adds[id] = count
+            end
+        end
+        
+        if next(normal_adds) ~= nil then
+            local NORMAL_KEY = "normalItem"
+            local reads = {{ collection = "backpack", key = NORMAL_KEY, user_id = user_id }}
+            local objects = nk.storage_read(reads)
+            local obj = objects[1]
+            local normal_items = (obj and obj.value) or {}
+            local version = (obj and obj.version)
+            
+            for id, count in pairs(normal_adds) do
+                local current = normal_items[id] or { count = 0, type = storage_types[id] }
+                current.count = current.count + count
+                current.type = storage_types[id] -- 确保类型更新
+                normal_items[id] = current
+            end
+            
+            nk.storage_write({{
+                collection = "backpack",
+                key = NORMAL_KEY,
+                user_id = user_id,
+                value = normal_items,
+                version = version,
+                permission_read = 1,
+                permission_write = 1
+            }})
         end
     end
     
     if log_source ~= nil then
-        local delta = aggregate_item_delta(items_to_add, 1)
-        if #delta > 0 then
-            pcall(M.write_inventory_log, context, user_id, log_source, delta, log_ref)
-        end
+        -- local delta = aggregate_item_delta(items_to_add, 1)
+        -- if #delta > 0 then
+        --     pcall(M.write_inventory_log, context, user_id, log_source, delta, log_ref)
+        -- end
     end
 
     return true
@@ -264,15 +306,30 @@ function M.consume_items(context, user_id, items_to_consume, log_source, log_ref
         if item_def.type == "currency" then
             wallet_changes[item.id] = -(item.count) -- Negative for deduction
         else
-            table.insert(storage_reads, { collection = "inventory", key = item.id, user_id = user_id })
+            table.insert(storage_reads, { collection = "backpack", key = item.id, user_id = user_id })
             items_map[item.id] = item.count
         end
     end
 
-    -- Process Storage Items first (manual check)
+    -- 2. Process Storage Items (manual check)
+    -- 注意：现在普通物品在 normalItem 字典里，特殊物品是单独 key
+    local SPECIAL_ITEMS = { ["item_vip_active"] = true, ["item_svip_active"] = true }
     local storage_writes = {}
-    if #storage_reads > 0 then
-        local objects = nk.storage_read(storage_reads)
+    
+    local special_reads = {}
+    local normal_consumes = {}
+    
+    for _, item in ipairs(storage_reads) do
+        if SPECIAL_ITEMS[item.key] then
+            table.insert(special_reads, item)
+        else
+            normal_consumes[item.key] = items_map[item.key]
+        end
+    end
+    
+    -- 2.1 处理特殊物品消耗
+    if #special_reads > 0 then
+        local objects = nk.storage_read(special_reads)
         for _, obj in ipairs(objects) do
             local required = items_map[obj.key]
             if required then
@@ -281,9 +338,8 @@ function M.consume_items(context, user_id, items_to_consume, log_source, log_ref
                     return false, "Insufficient item: " .. obj.key
                 end
                 
-                -- Prepare update
                 table.insert(storage_writes, {
-                    collection = "inventory",
+                    collection = "backpack",
                     key = obj.key,
                     user_id = user_id,
                     value = { count = current - required, type = obj.value.type },
@@ -291,13 +347,55 @@ function M.consume_items(context, user_id, items_to_consume, log_source, log_ref
                     permission_read = 1,
                     permission_write = 1
                 })
-                items_map[obj.key] = nil -- Mark as found
+                items_map[obj.key] = nil
             end
         end
+        -- Check missing special items
+        for k, _ in pairs(items_map) do
+            if SPECIAL_ITEMS[k] then
+                return false, "Item not found in inventory: " .. k
+            end
+        end
+    end
+    
+    -- 2.2 处理普通物品消耗
+    if next(normal_consumes) ~= nil then
+        local NORMAL_KEY = "normalItem"
+        local reads = {{ collection = "backpack", key = NORMAL_KEY, user_id = user_id }}
+        local objects = nk.storage_read(reads)
+        local obj = objects[1]
         
-        -- Check if any required item was not found in storage at all
-        for k, v in pairs(items_map) do
-            return false, "Item not found in inventory: " .. k
+        if not obj or not obj.value then
+            return false, "No normal items in inventory"
+        end
+        
+        local normal_items = obj.value
+        local updated = false
+        
+        for id, count in pairs(normal_consumes) do
+            local current_item = normal_items[id]
+            local current_count = (current_item and current_item.count) or 0
+            
+            if current_count < count then
+                return false, "Insufficient item: " .. id
+            end
+            
+            current_item.count = current_count - count
+            normal_items[id] = current_item
+            updated = true
+            items_map[id] = nil
+        end
+        
+        if updated then
+            table.insert(storage_writes, {
+                collection = "backpack",
+                key = NORMAL_KEY,
+                user_id = user_id,
+                value = normal_items,
+                version = obj.version,
+                permission_read = 1,
+                permission_write = 1
+            })
         end
     end
 
@@ -319,12 +417,29 @@ function M.consume_items(context, user_id, items_to_consume, log_source, log_ref
     if type(source) ~= "string" or source == "" then
         source = "consume"
     end
-    local delta = aggregate_item_delta(items_to_consume, -1)
-    if #delta > 0 then
-        pcall(M.write_inventory_log, context, user_id, source, delta, log_ref)
-    end
+    -- local delta = aggregate_item_delta(items_to_consume, -1)
+    -- if #delta > 0 then
+    --     pcall(M.write_inventory_log, context, user_id, source, delta, log_ref)
+    -- end
 
     return true
+end
+
+-- Helper to check if item is expired
+function M.is_item_expired(item_data)
+    if not item_data then return true end
+    local now = os.time()
+    return item_data.expireAt and now > item_data.expireAt
+end
+
+-- Helper to get remaining days of item
+function M.get_remaining_days(item_data)
+    if not item_data or M.is_item_expired(item_data) then
+        return 0
+    end
+    local now = os.time()
+    local remaining_seconds = item_data.expireAt - now
+    return math.ceil(remaining_seconds / (24 * 60 * 60))
 end
 
 function M.rpc_wallet_get(context, payload)
@@ -365,30 +480,78 @@ function M.rpc_inventory_get_items(context, payload)
     end
 
     local user_id = context.user_id
-    local reads = {}
+    local items = {}
+    local SPECIAL_ITEMS = { ["item_vip_active"] = true, ["item_svip_active"] = true }
+    
+    -- 如果 item_ids 为空，列出所有物品
+    if #item_ids == 0 then
+        -- 1. 取特殊物品
+        local ok, objects, _ = pcall(nk.storage_list, user_id, "backpack", 100, nil)
+        if not ok then return nk.json_encode({ error = "Failed to list inventory" }) end
+        
+        for _, obj in ipairs(objects or {}) do
+            if obj.key ~= "normalItem" then
+                local value = obj.value or {}
+                local count = value.count or 0
+                if type(count) ~= "number" then count = tonumber(count) or 0 end
+                table.insert(items, { id = obj.key, count = count, type = value.type })
+            end
+        end
+        
+        -- 2. 取普通物品 (normalItem)
+        local reads = {{ collection = "backpack", key = "normalItem", user_id = user_id }}
+        local normal_objs = nk.storage_read(reads)
+        if normal_objs[1] and normal_objs[1].value then
+            for id, data in pairs(normal_objs[1].value) do
+                table.insert(items, { id = id, count = data.count or 0, type = data.type })
+            end
+        end
+        
+        return nk.json_encode({ items = items })
+    end
+
+    -- 指定 ID 查询
+    local special_reads = {}
+    local need_normal = false
     local seen = {}
 
     for _, item_id in ipairs(item_ids) do
         if type(item_id) == "string" and item_id ~= "" and not seen[item_id] then
             seen[item_id] = true
-            table.insert(reads, { collection = "inventory", key = item_id, user_id = user_id })
+            if SPECIAL_ITEMS[item_id] then
+                table.insert(special_reads, { collection = "backpack", key = item_id, user_id = user_id })
+            else
+                need_normal = true
+            end
         end
     end
 
     local counts = {}
-    if #reads > 0 then
-        local objects = nk.storage_read(reads)
+    -- 读取特殊物品
+    if #special_reads > 0 then
+        local objects = nk.storage_read(special_reads)
         for _, obj in ipairs(objects) do
             local value = obj.value or {}
             local count = value.count or 0
-            if type(count) ~= "number" then
-                count = tonumber(count) or 0
-            end
+            if type(count) ~= "number" then count = tonumber(count) or 0 end
             counts[obj.key] = count
         end
     end
+    
+    -- 读取普通物品
+    if need_normal then
+        local reads = {{ collection = "backpack", key = "normalItem", user_id = user_id }}
+        local objects = nk.storage_read(reads)
+        if objects[1] and objects[1].value then
+            local normal_items = objects[1].value
+            for _, item_id in ipairs(item_ids) do
+                if not SPECIAL_ITEMS[item_id] and normal_items[item_id] then
+                    counts[item_id] = normal_items[item_id].count or 0
+                end
+            end
+        end
+    end
 
-    local items = {}
     for _, item_id in ipairs(item_ids) do
         if type(item_id) == "string" and item_id ~= "" then
             table.insert(items, { id = item_id, count = counts[item_id] or 0 })
@@ -399,7 +562,7 @@ function M.rpc_inventory_get_items(context, payload)
 end
 
 function M.rpc_inventory_list(context, payload)
-    -- RPC：列出背包（Storage(collection="inventory") 全量分页）
+    -- RPC：列出背包（Storage(collection="backpack") 全量分页）
     -- - 请求：{ page_size|limit: number, cursor?: string }
     -- - 响应：{ items: [ {id=key, count=number, type=string}, ... ], cursor: next_cursor }
     local decode_ok, req = json_decode_payload(payload)
@@ -420,9 +583,9 @@ function M.rpc_inventory_list(context, payload)
     end
 
     local user_id = context.user_id
-    local ok, objects, next_cursor = pcall(nk.storage_list, user_id, "inventory", limit, cursor)
+    local ok, objects, next_cursor = pcall(nk.storage_list, user_id, "backpack", limit, cursor)
     if not ok then
-        ok, objects, next_cursor = pcall(nk.storage_list, "inventory", user_id, limit, cursor)
+        ok, objects, next_cursor = pcall(nk.storage_list, "backpack", user_id, limit, cursor)
     end
     if not ok then
         return nk.json_encode({ error = tostring(objects) })

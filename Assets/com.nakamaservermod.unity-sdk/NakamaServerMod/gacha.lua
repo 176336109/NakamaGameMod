@@ -1,6 +1,6 @@
 local nk = require("nakama")
 local config = require("config")
-local inventory = require("inventory")
+local backpack = require("backpack")
 
 local M = {}
 
@@ -10,7 +10,7 @@ local M = {}
 - 依赖：
   - nakama：JSON 编解码与 Storage 读写。
   - config：读取卡池/横幅配置（config.gacha[banner_id]）。
-  - inventory：扣道具与发放奖励。
+  - backpack：扣道具与发放奖励。
 - 随机性来源：
   - 通过 Lua 标准库 math.random 产生随机数并按权重抽取；随机种子通常由运行时或其他模块在进程启动时初始化。
 ]]--
@@ -53,7 +53,7 @@ function M.rpc_gacha_pull(context, payload)
 
     -- 1) 扣除抽卡成本：按次数线性放大扣除数量（cost_amount * count）
     local cost_items = { { id = banner.cost_item, count = banner.cost_amount * count } }
-    local success, err = inventory.consume_items(context, user_id, cost_items, "consume", {
+    local success, err = backpack.consume_items(context, user_id, cost_items, "consume", {
         origin = "gacha",
         banner_id = banner_id,
         count = count,
@@ -119,8 +119,8 @@ function M.rpc_gacha_pull(context, payload)
         table.insert(results, { id = item_result.item_id, count = 1, rarity = item_result.rarity })
     end
 
-    -- 4) 发放奖励：将 results 作为奖励清单写入背包；同时附带本次保底状态用于审计/日志（由 inventory 模块处理）
-    local ok, err = inventory.add_items(context, user_id, results, "gacha", {
+    -- 4) 发放奖励：将 results 作为奖励清单写入背包；同时附带本次保底状态用于审计/日志（由 backpack 模块处理）
+    local ok, err = backpack.add_items(context, user_id, results, "gacha", {
         banner_id = banner_id,
         count = count,
         phase = "reward",

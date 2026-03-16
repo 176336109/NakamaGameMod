@@ -26,6 +26,11 @@ namespace NakamaServerMod.UnitySdk
             return _client.RpcAsync<string, DebugAddItemsResponse>("debug_add_items", payload, cancellationToken);
         }
 
+        public Task<InventoryItemsResponse> GetItemsAsync(CancellationToken cancellationToken = default)
+        {
+            return _client.RpcAsync<string, InventoryItemsResponse>("inventory_get_items", "{}", cancellationToken);
+        }
+
         private static string SerializeItemStacks(List<ItemStack> items)
         {
             var sb = new StringBuilder();

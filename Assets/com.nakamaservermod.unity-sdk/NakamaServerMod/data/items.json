@@ -1,0 +1,22 @@
+{
+    "items": {
+        "gold": { "type": "currency", "name": "Gold Coin" },
+        "gem": { "type": "currency", "name": "Gem" },
+        "energy": { "type": "currency", "name": "Energy" },
+        "item_diamond": { "type": "currency", "name": "Diamond" },
+        "item_gold": { "type": "currency", "name": "Gold Coin" },
+        "item_vip_active": { "type": "time_limited", "name": "VIP Monthly Card", "max_stack": 1 },
+        "item_svip_active": { "type": "time_limited", "name": "SVIP Monthly Card", "max_stack": 1 },
+        "exp_potion": { "type": "item", "name": "EXP Potion", "max_stack": 999 },
+        "hero_ssr_001": { "type": "hero", "name": "SSR Knight", "rarity": "SSR" },
+        "hero_sr_001": { "type": "hero", "name": "SR Archer", "rarity": "SR" },
+        "hero_r_001": { "type": "hero", "name": "R Soldier", "rarity": "R" },
+        "010300001": { "type": "item", "name": "Time Hourglass", "max_stack": 9999 },
+        "020100001": { "type": "item", "name": "Skill Shard (Green)", "max_stack": 999 },
+        "020200001": { "type": "item", "name": "Skill Shard (Blue)", "max_stack": 999 },
+        "020300001": { "type": "item", "name": "Skill Shard (Purple)", "max_stack": 999 },
+        "030100001": { "type": "item", "name": "Mod Shard (Green)", "max_stack": 999 },
+        "030200001": { "type": "item", "name": "Mod Shard (Blue)", "max_stack": 999 },
+        "PACK_GROWTH_001": { "type": "item", "name": "Growth Gift Pack", "max_stack": 1 }
+    }
+}

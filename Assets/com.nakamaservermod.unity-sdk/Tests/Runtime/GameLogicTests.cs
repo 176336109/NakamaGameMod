@@ -38,7 +38,7 @@ namespace NakamaServerMod.UnitySdk.Tests
 
             // 1. 获取签到全局状态
             var state = await checkinService.GetStateAsync();
-            Assert.IsTrue(state.success);
+            Assert.IsNotNull(state);
             Assert.Greater(state.cycle_no, 0);
             Assert.IsNotNull(state.days);
 
@@ -46,7 +46,7 @@ namespace NakamaServerMod.UnitySdk.Tests
             var checkinResp = await checkinService.DailyCheckinAsync();
             Assert.IsTrue(checkinResp.success, "每日签到应该成功");
             Assert.IsNotNull(checkinResp.rewards, "请求成功后应当返回奖励");
-            Assert.Greater(checkinResp.streak, 0, "签到天数不应为0");
+            Assert.Greater(checkinResp.day_index, 0, "签到天数不应为0");
         }
 
         [Test]
