@@ -1,6 +1,6 @@
 local nk = require("nakama")
 local config = require("config")
-local backpack = require("backpack")
+local backpack = require("domain.backpack")
 
 local M = {}
 
