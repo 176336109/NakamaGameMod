@@ -4,6 +4,7 @@ local gacha = require("gacha")
 local checkin = require("checkin")
 local iap = require("iap")
 local vip_svip = require("vip_svip")
+local shop = require("shop")
 
 -- NakamaMod/main.lua
 -- Nakama Lua runtime 使用顶层代码直接注册 RPC，不需要 InitModule / initializer。
@@ -31,7 +32,8 @@ nk.register_rpc(gacha.rpc_gacha_pull, "gacha_pull")
 nk.register_rpc(checkin.rpc_daily_checkin, "daily_checkin")
 nk.register_rpc(checkin.rpc_checkin_get_state, "checkin_get_state")
 nk.register_rpc(checkin.rpc_checkin_makeup, "checkin_makeup")
-nk.register_rpc(checkin.rpc_checkin_claim_bonus, "checkin_claim_bonus")
+nk.register_rpc(checkin.rpc_debug_set_time_offset, "debug_set_time_offset")
+
 
 -- 4) VIP/SVIP RPCs
 nk.register_rpc(vip_svip.rpc_purchase_vip, "purchase_vip")
@@ -50,7 +52,12 @@ nk.register_rpc(vip_svip.rpc_record_plunder_usage, "record_plunder_usage")
 nk.register_rpc(vip_svip.rpc_check_queue_permission, "check_queue_permission")
 nk.register_rpc(vip_svip.rpc_debug_simulate_purchase, "debug_simulate_purchase")
 
--- 5) IAP：Lua runtime 没有 register_purchase_validate_* hook API。
+-- 5) Shop RPCs
+nk.register_rpc(shop.rpc_shop_get_state, "shop_get_state")
+nk.register_rpc(shop.rpc_shop_refresh, "shop_refresh")
+nk.register_rpc(shop.rpc_shop_buy, "shop_buy")
+
+-- 6) IAP：Lua runtime 没有 register_purchase_validate_* hook API。
 --    Apple/Google 收据校验需通过客户端调用 Nakama 原生 API，
 --    如需服务端发货逻辑，可通过 register_req_after 挂钩在校验完成后触发。
 --    示例（如需启用请取消注释）：
@@ -63,4 +70,3 @@ nk.register_rpc(vip_svip.rpc_debug_simulate_purchase, "debug_simulate_purchase")
 -- end, "ValidatePurchaseApple")
 
 nk.logger_info("----> [NakamaServerMod] All RPCs registered OK <----")
-
