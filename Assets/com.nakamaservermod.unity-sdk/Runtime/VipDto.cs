@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace NakamaServerMod.UnitySdk
 {
@@ -123,7 +124,10 @@ namespace NakamaServerMod.UnitySdk
     [Serializable]
     public class InventoryItemsResponse
     {
+        public bool success;
+        public RpcError error;
         public InventoryItem[] items;
+        public InventoryState state;
     }
 
     [Serializable]
@@ -131,6 +135,151 @@ namespace NakamaServerMod.UnitySdk
     {
         public string id;
         public long count;
+    }
+
+    [Serializable]
+    public class RpcError
+    {
+        public string code;
+        public string message;
+    }
+
+    [Serializable]
+    public class InventoryState
+    {
+        public int slotCapacity;
+        public int usedSlotCount;
+        public long version;
+        public long lastCleanupAt;
+    }
+
+    [Serializable]
+    public class InventoryGetItemsRequest
+    {
+        public List<string> item_ids;
+    }
+
+    [Serializable]
+    public class InventoryListRequest
+    {
+        public int page_size;
+        public string cursor;
+    }
+
+    [Serializable]
+    public class InventoryListItem
+    {
+        public string key;
+        public string id;
+        public long count;
+        public string itemType;
+        public bool stackable;
+        public bool hasExpireAt;
+        public long expireAt;
+        public string instanceId;
+    }
+
+    [Serializable]
+    public class InventoryListResponse
+    {
+        public bool success;
+        public RpcError error;
+        public List<InventoryListItem> items;
+        public string cursor;
+        public InventoryState state;
+    }
+
+    [Serializable]
+    public class InventoryLogListRequest
+    {
+        public int page_size;
+        public string cursor;
+        public long start_ts;
+        public long end_ts;
+        public string source;
+        public string item_id;
+        public string user_id;
+        public string target_user_id;
+        public string admin_token;
+    }
+
+    [Serializable]
+    public class InventoryLogValue
+    {
+        public string source;
+        public List<InventoryItem> items;
+        public object @ref;
+        public string ts_utc;
+        public long ts;
+    }
+
+    [Serializable]
+    public class InventoryLogEntry
+    {
+        public string key;
+        public string user_id;
+        public InventoryLogValue value;
+    }
+
+    [Serializable]
+    public class InventoryLogListResponse
+    {
+        public bool success;
+        public RpcError error;
+        public List<InventoryLogEntry> logs;
+        public string cursor;
+    }
+
+    [Serializable]
+    public class WalletGetResponse
+    {
+        public bool success;
+        public RpcError error;
+        public Dictionary<string, long> wallet;
+    }
+
+    [Serializable]
+    public class BackpackItem
+    {
+        public string id;
+        public long count;
+        public long expireAt;
+        public string benefitPlanId;
+    }
+
+    [Serializable]
+    public class BackpackMutationRequest
+    {
+        public List<BackpackItem> items;
+        public string source;
+        public string requestId;
+        public object @ref;
+    }
+
+    [Serializable]
+    public class BackpackMutationResult
+    {
+        public bool success;
+        public string requestId;
+        public bool idempotent;
+        public bool cleaned;
+        public InventoryState state;
+    }
+
+    [Serializable]
+    public class BackpackMutationResponse
+    {
+        public bool success;
+        public RpcError error;
+        public BackpackMutationResult result;
+    }
+
+    [Serializable]
+    public class BackpackGetStateResponse
+    {
+        public bool success;
+        public RpcError error;
+        public InventoryState state;
     }
 
     /// <summary>

@@ -26,6 +26,10 @@ M.items = {
     ["PACK_GROWTH_001"] = { type = "item", name = "Growth Gift Pack", max_stack = 1 },
 }
 
+M.backpack = {
+    slot_capacity = 100
+}
+
 -- 抽卡配置
 M.gacha = {
     ["standard_banner"] = {
