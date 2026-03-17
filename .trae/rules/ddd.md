@@ -5,7 +5,7 @@ description: 关于Nakama的Lua模组编码规范
 # 关于Nakama的Lua模组编码规范,DDD范式
 
 ## 目录
-`com.nakamaservermod.unity-sdk/NakamaServerMod`
+`Server/NakamaServerMod`
 
 ## 规范
 - **data**：相关配置
