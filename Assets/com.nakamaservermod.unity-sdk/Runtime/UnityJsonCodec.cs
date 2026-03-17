@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Text.RegularExpressions;
 using UnityEngine;
 
 namespace NakamaServerMod.UnitySdk
@@ -39,6 +40,11 @@ namespace NakamaServerMod.UnitySdk
                 return default;
             }
 
+            if (typeof(T) == typeof(WalletGetResponse))
+            {
+                return (T)(object)ParseWalletGetResponse(json);
+            }
+
             try
             {
                 return JsonUtility.FromJson<T>(json);
@@ -47,6 +53,46 @@ namespace NakamaServerMod.UnitySdk
             {
                 throw;
             }
+        }
+
+        private static WalletGetResponse ParseWalletGetResponse(string json)
+        {
+            var response = new WalletGetResponse
+            {
+                wallet = new Dictionary<string, long>(),
+                success = Regex.IsMatch(json, "\"success\"\\s*:\\s*true", RegexOptions.IgnoreCase)
+            };
+
+            var walletMatch = Regex.Match(json, "\"wallet\"\\s*:\\s*\\{(?<body>[\\s\\S]*?)\\}");
+            if (!walletMatch.Success)
+            {
+                return response;
+            }
+
+            var body = walletMatch.Groups["body"].Value;
+            var entryMatches = Regex.Matches(body, "\"(?<key>[^\"\\\\]+)\"\\s*:\\s*(?<value>-?\\d+)");
+            foreach (Match entry in entryMatches)
+            {
+                if (!entry.Success)
+                {
+                    continue;
+                }
+
+                var key = entry.Groups["key"].Value;
+                if (string.IsNullOrEmpty(key))
+                {
+                    continue;
+                }
+
+                if (!long.TryParse(entry.Groups["value"].Value, out var value))
+                {
+                    continue;
+                }
+
+                response.wallet[key] = value;
+            }
+
+            return response;
         }
 
         private static string SerializeItemStacks(List<ItemStack> items)

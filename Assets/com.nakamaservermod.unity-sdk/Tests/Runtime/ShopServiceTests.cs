@@ -28,9 +28,9 @@ namespace NakamaServerMod.UnitySdk.Tests
 
         private async Task<Dictionary<string, long>> GetWalletAsync(GameClient client)
         {
-            var account = await client.GetAccountAsync();
-            return Unity.Plastic.Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, long>>(account.Wallet)
-                   ?? new Dictionary<string, long>();
+            var inventoryService = new InventoryService(client);
+            var response = await inventoryService.GetWalletAsync();
+            return response?.wallet ?? new Dictionary<string, long>();
         }
 
         private static ShopItem FindFixedItemByLimitType(ShopGetStateResponse state, string limitType)
