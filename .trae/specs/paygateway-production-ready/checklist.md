@@ -1,0 +1,6 @@
+- [x] PostgreSQL connection is established when `db.type` is "postgres".
+- [x] GORM `AutoMigrate` is called for `Order`, `Refund`, and `CallbackLog` models.
+- [x] `README.md` explains the database initialization process (AutoMigrate).
+- [x] Zap logger is initialized and used across the application.
+- [x] Contextual information (OrderID, errors) is properly logged in Service and Provider layers.
+- [x] HTTP requests are logged via a Gin middleware.

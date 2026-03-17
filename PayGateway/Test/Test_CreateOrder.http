@@ -1,0 +1,11 @@
+POST http://localhost:8080/v1/orders
+Content-Type: application/json
+
+{
+    "app_id": "game_001",
+    "user_id": "user_123",
+    "product_id": "gold_pack_1",
+    "amount": 100,
+    "currency": "CNY",
+    "provider": "myprovider"
+}

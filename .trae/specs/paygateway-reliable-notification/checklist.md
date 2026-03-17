@@ -1,0 +1,6 @@
+- [x] `NotifyTask` model is defined and auto-migrated.
+- [x] `Repo` interface supports database transactions.
+- [x] `HandleNotify` updates Order, creates CallbackLog, and creates NotifyTask within a single transaction.
+- [x] `notifyBusiness` updates the `NotifyTask` status to SUCCESS upon a 2xx HTTP response.
+- [x] Failed notifications increment `RetryCount` and update `NextRetryAt` using exponential backoff.
+- [x] Background retryer successfully polls and retries pending tasks.

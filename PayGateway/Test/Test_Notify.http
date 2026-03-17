@@ -1,0 +1,7 @@
+POST http://localhost:8080/v1/providers/myprovider/notify
+Content-Type: application/json
+
+{
+    "order_id": "78c1dd8c-fc1a-4131-b8b9-0a7a1128ccd4",
+    "status": "SUCCESS"
+}
