@@ -28,7 +28,77 @@ namespace NakamaServerMod.UnitySdk
 
         public Task<InventoryItemsResponse> GetItemsAsync(CancellationToken cancellationToken = default)
         {
-            return _client.RpcAsync<string, InventoryItemsResponse>("inventory_get_items", "{}", cancellationToken);
+            return _client.RpcAsync<InventoryItemsResponse>("inventory_get_items", cancellationToken);
+        }
+
+        public Task<InventoryItemsResponse> GetItemsAsync(IReadOnlyList<string> itemIds, CancellationToken cancellationToken = default)
+        {
+            var request = new InventoryGetItemsRequest
+            {
+                item_ids = itemIds == null ? null : new List<string>(itemIds)
+            };
+            return _client.RpcAsync<InventoryGetItemsRequest, InventoryItemsResponse>("inventory_get_items", request, cancellationToken);
+        }
+
+        public Task<InventoryListResponse> ListAsync(int pageSize = 100, string cursor = null, CancellationToken cancellationToken = default)
+        {
+            var request = new InventoryListRequest
+            {
+                page_size = pageSize,
+                cursor = cursor
+            };
+            return _client.RpcAsync<InventoryListRequest, InventoryListResponse>("inventory_list", request, cancellationToken);
+        }
+
+        public Task<InventoryLogListResponse> GetLogsAsync(InventoryLogListRequest request, CancellationToken cancellationToken = default)
+        {
+            return _client.RpcAsync<InventoryLogListRequest, InventoryLogListResponse>("inventory_log_list", request ?? new InventoryLogListRequest(), cancellationToken);
+        }
+
+        public Task<WalletGetResponse> GetWalletAsync(CancellationToken cancellationToken = default)
+        {
+            return _client.RpcAsync<WalletGetResponse>("wallet_get", cancellationToken);
+        }
+
+        public Task<BackpackMutationResponse> GrantAsync(BackpackMutationRequest request, CancellationToken cancellationToken = default)
+        {
+            ValidateMutationRequest(request);
+            return _client.RpcAsync<BackpackMutationRequest, BackpackMutationResponse>("backpack_grant", request, cancellationToken);
+        }
+
+        public Task<BackpackMutationResponse> ConsumeAsync(BackpackMutationRequest request, CancellationToken cancellationToken = default)
+        {
+            ValidateMutationRequest(request);
+            return _client.RpcAsync<BackpackMutationRequest, BackpackMutationResponse>("backpack_consume", request, cancellationToken);
+        }
+
+        public Task<BackpackMutationResponse> UseAsync(BackpackMutationRequest request, CancellationToken cancellationToken = default)
+        {
+            ValidateMutationRequest(request);
+            return _client.RpcAsync<BackpackMutationRequest, BackpackMutationResponse>("backpack_use", request, cancellationToken);
+        }
+
+        public Task<BackpackMutationResponse> CleanupAsync(CancellationToken cancellationToken = default)
+        {
+            return _client.RpcAsync<BackpackMutationResponse>("backpack_cleanup", cancellationToken);
+        }
+
+        public Task<BackpackGetStateResponse> GetBackpackStateAsync(CancellationToken cancellationToken = default)
+        {
+            return _client.RpcAsync<BackpackGetStateResponse>("backpack_get_state", cancellationToken);
+        }
+
+        private static void ValidateMutationRequest(BackpackMutationRequest request)
+        {
+            if (request == null)
+            {
+                throw new ArgumentNullException(nameof(request));
+            }
+
+            if (request.items == null)
+            {
+                throw new ArgumentException("request.items cannot be null.", nameof(request));
+            }
         }
 
         private static string SerializeItemStacks(List<ItemStack> items)

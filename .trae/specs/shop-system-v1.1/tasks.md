@@ -20,6 +20,11 @@
 - [ ] Task 4: Implement Tests.
     - [ ] `ShopServiceTests.cs`: Cover C01-C16 and boundary cases.
 
+- [ ] Task 5: Fix verification failures from checklist
+    - [ ] Implement atomic rollback in `rpc_shop_buy` when reward grant fails after cost deduction.
+    - [ ] Add deterministic time-control test hook for shop day/week reset verification.
+    - [ ] Execute and pass all core C01-C16 scenarios with runnable automation evidence.
+
 # Task Dependencies
 - Task 2 depends on Task 1.
 - Task 4 depends on Task 2 and Task 3.

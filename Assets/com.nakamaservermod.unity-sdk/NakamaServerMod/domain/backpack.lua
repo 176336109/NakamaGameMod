@@ -24,47 +24,19 @@ local config = require("config")
 
 local M = {}
 
-local function json_decode_payload(payload)
-    -- payload 允许为空：nil/"" 会被视为 {}
-    -- 返回值：(decode_ok:boolean, table_or_nil)
-    if payload == nil or payload == "" then
-        return true, {}
-    end
-    local ok, value = pcall(nk.json_decode, payload)
-    if not ok then
-        return false, nil
-    end
-    if value == nil then
-        return true, {}
-    end
-    return true, value
-end
+local BACKPACK_COLLECTION = "backpack"
+local IDEMP_COLLECTION = "backpack_idempotency"
+local NORMAL_ITEM_KEY = "normalItem"
+local VIP_ITEM_ID = "item_vip_active"
+local SVIP_ITEM_ID = "item_svip_active"
 
-local function aggregate_item_delta(items, multiplier)
-    -- 将 items 数组按 id 聚合为“增量列表”，并按 id 排序：
-    -- - items: { {id=string, count=number|string}, ... }
-    -- - multiplier: 1 表示增加，-1 表示消耗（用于写 inventory_log）
-    local agg = {}
-    for _, item in ipairs(items or {}) do
-        local id = item.id
-        local count = tonumber(item.count) or 0
-        if type(id) == "string" and id ~= "" and count ~= 0 then
-            agg[id] = (agg[id] or 0) + (count * multiplier)
-        end
-    end
-
-    local delta = {}
-    for id, count in pairs(agg) do
-        if count ~= 0 then
-            table.insert(delta, { id = id, count = count })
-        end
-    end
-    table.sort(delta, function(a, b) return a.id < b.id end)
-    return delta
-end
+local ITEM_ALIAS = {
+    ["crystal"] = "gem",
+    ["item_crystal"] = "gem",
+    ["水晶"] = "gem"
+}
 
 local function safe_uuid()
-    -- 优先使用 nk.uuid_v4；若运行时不可用则退化为随机字符串（仅用于日志 key 去重）
     if nk.uuid_v4 ~= nil then
         local ok, value = pcall(nk.uuid_v4)
         if ok and type(value) == "string" and value ~= "" then
@@ -74,772 +46,839 @@ local function safe_uuid()
     return tostring(math.random(1000000000, 2147483647)) .. tostring(math.random(1000000000, 2147483647))
 end
 
-local function make_inventory_log_key(ts_sec)
-    -- 日志 key 设计为：YYYYMMDD_秒级时间戳_uuid
-    -- 目的：按 key 的字典序近似时间有序，且同秒内可去重
-    local day = os.date("!%Y%m%d", ts_sec)
-    return day .. "_" .. string.format("%010d", ts_sec) .. "_" .. safe_uuid()
+local function to_number(v, default_value)
+    local n = tonumber(v)
+    if n == nil then
+        return default_value
+    end
+    return n
 end
 
-function M.write_inventory_log(context, user_id, source, items_delta, ref)
-    -- 写入背包变更流水（collection="inventory_log"）
-    --
-    -- 语义：
-    -- - source: 变更来源（字符串，必填；用于按系统/功能归因与筛选）
-    -- - items_delta: 变更明细数组（必填；count 为正表示增加，为负表示消耗）
-    -- - ref: 可选扩展字段（table）；会自动补充 request_id/username（若 context 中存在）
-    --
-    -- 存储字段（value）：
-    -- - source: string
-    -- - items: items_delta 原样存储
-    -- - ref: table（可能包含 request_id/username）
-    -- - ts_utc: ISO-8601 UTC 时间字符串（便于人工阅读）
-    -- - ts: 秒级时间戳（便于范围查询/过滤）
-    --
-    -- 权限：
-    -- - permission_write=0：禁止客户端写入；仅服务端逻辑调用
-    -- - permission_read=1：允许读取同 user_id 的日志；跨用户读取由 rpc_inventory_log_list 额外做权限校验
-    if type(source) ~= "string" or source == "" then
-        return false, "invalid source"
-    end
-    if type(items_delta) ~= "table" or #items_delta == 0 then
-        return false, "invalid items_delta"
-    end
+local function now_ts()
+    return os.time()
+end
 
-    local ts_sec = os.time()
-    local value = {
-        source = source,
-        items = items_delta,
-        ref = ref,
-        ts_utc = os.date("!%Y-%m-%dT%H:%M:%SZ", ts_sec),
-        ts = ts_sec
+local function decode_payload(payload)
+    if payload == nil or payload == "" then
+        return true, {}
+    end
+    local ok, value = pcall(nk.json_decode, payload)
+    if not ok then
+        return false, nil
+    end
+    if type(value) ~= "table" then
+        return false, nil
+    end
+    return true, value
+end
+
+local function resolve_item_id(item_id)
+    if type(item_id) ~= "string" or item_id == "" then
+        return nil
+    end
+    return ITEM_ALIAS[item_id] or item_id
+end
+
+local function is_effective(expire_at, now)
+    if expire_at == nil then
+        return true
+    end
+    return expire_at > now
+end
+
+local function get_slot_capacity()
+    local backpack_cfg = config.backpack or {}
+    local slot_capacity = to_number(backpack_cfg.slotCapacity, nil)
+    if slot_capacity == nil then
+        slot_capacity = to_number(backpack_cfg.slot_capacity, 100)
+    end
+    if slot_capacity < 1 then
+        slot_capacity = 1
+    end
+    return math.floor(slot_capacity)
+end
+
+local function get_item_config(item_id)
+    local item_def = config.items and config.items[item_id]
+    if not item_def then
+        return nil
+    end
+    local is_currency = item_def.type == "currency"
+    local is_vip_like = item_id == VIP_ITEM_ID or item_id == SVIP_ITEM_ID
+    local stackable = not is_vip_like and not is_currency
+    if item_def.max_stack ~= nil and tonumber(item_def.max_stack) == 1 and item_def.type == "time_limited" then
+        stackable = false
+    end
+    local has_expire_at = is_vip_like or item_def.type == "time_limited"
+    local occupy_slot = not is_currency
+    local max_stack_count = to_number(item_def.max_stack, 999999999)
+    return {
+        itemId = item_id,
+        itemType = item_def.type,
+        stackable = stackable,
+        hasExpireAt = has_expire_at,
+        occupySlot = occupy_slot,
+        maxStackCount = max_stack_count
     }
+end
 
-    if value.ref == nil or type(value.ref) ~= "table" then
-        value.ref = {}
-    end
-    if type(context) == "table" then
-        if context.request_id ~= nil then
-            value.ref.request_id = context.request_id
+local function list_all_objects(user_id, collection)
+    local all = {}
+    local cursor = nil
+    local rounds = 0
+    while true do
+        rounds = rounds + 1
+        if rounds > 100 then
+            break
         end
-        if context.username ~= nil then
-            value.ref.username = context.username
+        local ok, objects, next_cursor = pcall(nk.storage_list, user_id, collection, 100, cursor)
+        if not ok then
+            ok, objects, next_cursor = pcall(nk.storage_list, collection, user_id, 100, cursor)
         end
+        if not ok then
+            return false, tostring(objects)
+        end
+        for _, obj in ipairs(objects or {}) do
+            all[#all + 1] = obj
+        end
+        if next_cursor == nil or next_cursor == "" then
+            break
+        end
+        cursor = next_cursor
     end
+    return true, all
+end
 
-    local key = make_inventory_log_key(ts_sec)
-    nk.storage_write({
-        {
-            collection = "inventory_log",
-            key = key,
-            user_id = user_id,
-            value = value,
-            permission_read = 1,
-            permission_write = 0
+local function load_snapshot(user_id)
+    local ok, objects_or_err = list_all_objects(user_id, BACKPACK_COLLECTION)
+    if not ok then
+        return false, objects_or_err
+    end
+    local by_key = {}
+    for _, obj in ipairs(objects_or_err) do
+        by_key[obj.key] = {
+            key = obj.key,
+            value = obj.value or {},
+            version = obj.version
         }
-    })
-    return true, key
+    end
+    return true, by_key
 end
 
--- Helper to add items to user
-function M.add_items(context, user_id, items_to_add, log_source, log_ref)
-    -- 加物品流程：
-    -- 1) 遍历 items_to_add，按 config.items[item_id].type 分流：
-    --    - currency：累计到 wallet_changes，最终使用 nk.wallet_update 原子更新
-    --    - 非 currency：累计到 storage_adds，并记录 type（写入 inventory 的 value.type）
-    -- 2) Wallet 更新：nk.wallet_update(..., check=true)（这里是“加钱”，通常不会失败；check 仍保持一致）
-    -- 3) Storage 更新：先读出当前 count/version，再写入新 count，并带 version 做并发控制；
-    --    若发生写入冲突/异常则重读并重试一次，以提高成功率。
-    -- 4) 记流水：当 log_source 非空时，聚合增量（count>0）写入 inventory_log；失败不影响主流程（pcall）。
-    local wallet_changes = {}
-    local wallet_updated = false
-    local storage_adds = {}
-    local storage_types = {}
-
-    for _, item in ipairs(items_to_add) do
-        local item_def = config.items[item.id]
-        if not item_def then
-            nk.logger_error("Item definition not found: " .. item.id)
-            goto continue
-        end
-
-        if item_def.type == "currency" then
-            -- Wallet 变更会累加后一次性提交
-            wallet_changes[item.id] = (wallet_changes[item.id] or 0) + item.count
-            wallet_updated = true
-        else
-            storage_adds[item.id] = (storage_adds[item.id] or 0) + item.count
-            storage_types[item.id] = item_def.type
-        end
-        
-        ::continue::
-    end
-
-    -- 写入 Wallet（货币）
-    if wallet_updated then
-        local metadata = { source = log_source or "game_logic" }
-        nk.wallet_update(user_id, wallet_changes, metadata, true)
-    end
-
-    -- 写入 Storage（非货币背包）
-    if next(storage_adds) ~= nil then
-        -- 区分特殊物品（单独存）和普通物品（存 normalItem）
-        local SPECIAL_ITEMS = { ["item_vip_active"] = true, ["item_svip_active"] = true }
-        
-        -- 1. 处理特殊物品 (单独存)
-        local special_adds = {}
-        for id, count in pairs(storage_adds) do
-            if SPECIAL_ITEMS[id] then
-                special_adds[id] = count
-            end
-        end
-        
-        if next(special_adds) ~= nil then
-            local special_reads = {}
-            for item_id, _ in pairs(special_adds) do
-                table.insert(special_reads, { collection = "backpack", key = item_id, user_id = user_id })
-            end
-            
-            local objects = nk.storage_read(special_reads)
-            local writes = {}
-            
-            for _, obj in ipairs(objects) do
-                local item_id = obj.key
-                local count = special_adds[item_id]
-                if count then
-                    local current = (obj.value and obj.value.count) or 0
-                    table.insert(writes, {
-                        collection = "backpack",
-                        key = item_id,
-                        user_id = user_id,
-                        value = { count = current + count, type = (obj.value and obj.value.type) or storage_types[item_id] },
-                        version = obj.version,
-                        permission_read = 1,
-                        permission_write = 1
-                    })
-                    special_adds[item_id] = nil
-                end
-            end
-            
-            -- 新增的特殊物品
-            for item_id, count in pairs(special_adds) do
-                table.insert(writes, {
-                    collection = "backpack",
-                    key = item_id,
-                    user_id = user_id,
-                    value = { count = count, type = storage_types[item_id] },
-                    permission_read = 1,
-                    permission_write = 1
-                })
-            end
-            
-            if #writes > 0 then
-                nk.storage_write(writes)
-            end
-        end
-        
-        -- 2. 处理普通物品 (合并存 normalItem)
-        local normal_adds = {}
-        for id, count in pairs(storage_adds) do
-            if not SPECIAL_ITEMS[id] then
-                normal_adds[id] = count
-            end
-        end
-        
-        if next(normal_adds) ~= nil then
-            local NORMAL_KEY = "normalItem"
-            local reads = {{ collection = "backpack", key = NORMAL_KEY, user_id = user_id }}
-            local objects = nk.storage_read(reads)
-            local obj = objects[1]
-            local normal_items = (obj and obj.value) or {}
-            local version = (obj and obj.version)
-            
-            for id, count in pairs(normal_adds) do
-                local current = normal_items[id] or { count = 0, type = storage_types[id] }
-                current.count = current.count + count
-                current.type = storage_types[id] -- 确保类型更新
-                normal_items[id] = current
-            end
-            
-            nk.storage_write({{
-                collection = "backpack",
-                key = NORMAL_KEY,
-                user_id = user_id,
-                value = normal_items,
-                version = version,
-                permission_read = 1,
-                permission_write = 1
-            }})
-        end
-    end
-    
-    if log_source ~= nil then
-        -- local delta = aggregate_item_delta(items_to_add, 1)
-        -- if #delta > 0 then
-        --     pcall(M.write_inventory_log, context, user_id, log_source, delta, log_ref)
-        -- end
-    end
-
-    return true
+local function is_stack_record(value)
+    return type(value) == "table" and value.recordType == "stack"
 end
 
--- Helper to consume items (cost check)
-function M.consume_items(context, user_id, items_to_consume, log_source, log_ref)
-    -- 消耗物品流程（带“余额/库存不足”校验）：
-    -- 1) 分流：
-    --    - currency：构造负数 wallet_changes，交由 nk.wallet_update(check=true) 做原子扣减与不足校验
-    --    - 非 currency：先 storage_read 取出当前 count/version，手动校验不足则直接失败
-    -- 2) 应用变更：
-    --    - Wallet：先扣（原子校验）；失败返回 "Insufficient currency"
-    --    - Storage：再写入扣减后的 count（带 version）
-    -- 注意：Wallet 与 Storage 不在同一个原子事务里；若需要跨两类资产的强一致，可在上层设计“仅一种资产作为成本”或引入补偿/事务化方案。
-    -- 1. Check if user has enough
-    -- This requires reading wallet and storage first.
-    -- For simplicity, wallet_update with negative values will fail if insufficient funds (if check is true)
-    
-    local wallet_changes = {}
-    local storage_reads = {}
-    local items_map = {} -- Map for quick lookup of non-currency items
-
-    for _, item in ipairs(items_to_consume) do
-        local item_def = config.items[item.id]
-        if item_def.type == "currency" then
-            wallet_changes[item.id] = -(item.count) -- Negative for deduction
-        else
-            table.insert(storage_reads, { collection = "backpack", key = item.id, user_id = user_id })
-            items_map[item.id] = item.count
-        end
+local function get_normal_item_object(snapshot)
+    local obj = snapshot[NORMAL_ITEM_KEY]
+    if not obj then
+        obj = {
+            key = NORMAL_ITEM_KEY,
+            version = nil,
+            value = {}
+        }
+        snapshot[NORMAL_ITEM_KEY] = obj
     end
-
-    -- 2. Process Storage Items (manual check)
-    -- 注意：现在普通物品在 normalItem 字典里，特殊物品是单独 key
-    local SPECIAL_ITEMS = { ["item_vip_active"] = true, ["item_svip_active"] = true }
-    local storage_writes = {}
-    
-    local special_reads = {}
-    local normal_consumes = {}
-    
-    for _, item in ipairs(storage_reads) do
-        if SPECIAL_ITEMS[item.key] then
-            table.insert(special_reads, item)
-        else
-            normal_consumes[item.key] = items_map[item.key]
-        end
+    if type(obj.value) ~= "table" then
+        obj.value = {}
     end
-    
-    -- 2.1 处理特殊物品消耗
-    if #special_reads > 0 then
-        local objects = nk.storage_read(special_reads)
-        for _, obj in ipairs(objects) do
-            local required = items_map[obj.key]
-            if required then
-                local current = obj.value.count or 0
-                if current < required then
-                    return false, "Insufficient item: " .. obj.key
+    return obj
+end
+
+local function is_instance_record(key, value)
+    if type(value) ~= "table" then
+        return false
+    end
+    if value.recordType == "instance" then
+        return true
+    end
+    if key == VIP_ITEM_ID or key == SVIP_ITEM_ID then
+        return true
+    end
+    return false
+end
+
+local function recalc_used_slots(snapshot, now)
+    local used = 0
+    for key, obj in pairs(snapshot) do
+        local value = obj.value or {}
+        if is_stack_record(value) then
+            local count = to_number(value.count, 0)
+            local has_expire = value.hasExpireAt == true
+            local expire_at = to_number(value.expireAt, nil)
+            if count > 0 and ((not has_expire) or is_effective(expire_at, now)) then
+                used = used + 1
+            end
+        elseif is_instance_record(key, value) then
+            local expire_at = to_number(value.expireAt, nil)
+            if is_effective(expire_at, now) then
+                used = used + 1
+            end
+        elseif key == NORMAL_ITEM_KEY and type(value) == "table" then
+            for _, v in pairs(value) do
+                if type(v) == "table" and to_number(v.count, 0) > 0 then
+                    local has_expire = v.hasExpireAt == true
+                    local expire_at = to_number(v.expireAt, nil)
+                    if (not has_expire) or is_effective(expire_at, now) then
+                        used = used + 1
+                    end
                 end
-                
-                table.insert(storage_writes, {
-                    collection = "backpack",
-                    key = obj.key,
-                    user_id = user_id,
-                    value = { count = current - required, type = obj.value.type },
-                    version = obj.version,
-                    permission_read = 1,
-                    permission_write = 1
-                })
-                items_map[obj.key] = nil
-            end
-        end
-        -- Check missing special items
-        for k, _ in pairs(items_map) do
-            if SPECIAL_ITEMS[k] then
-                return false, "Item not found in inventory: " .. k
             end
         end
     end
-    
-    -- 2.2 处理普通物品消耗
-    if next(normal_consumes) ~= nil then
-        local NORMAL_KEY = "normalItem"
-        local reads = {{ collection = "backpack", key = NORMAL_KEY, user_id = user_id }}
-        local objects = nk.storage_read(reads)
-        local obj = objects[1]
-        
-        if not obj or not obj.value then
-            return false, "No normal items in inventory"
-        end
-        
-        local normal_items = obj.value
-        local updated = false
-        
-        for id, count in pairs(normal_consumes) do
-            local current_item = normal_items[id]
-            local current_count = (current_item and current_item.count) or 0
-            
-            if current_count < count then
-                return false, "Insufficient item: " .. id
+    return used
+end
+
+local function cleanup_expired(snapshot, now, touched)
+    for key, obj in pairs(snapshot) do
+        local value = obj.value or {}
+        if is_stack_record(value) then
+            local has_expire = value.hasExpireAt == true
+            local expire_at = to_number(value.expireAt, nil)
+            local count = to_number(value.count, 0)
+            if count <= 0 then
+                value.count = 0
+                touched[key] = true
+            elseif has_expire and not is_effective(expire_at, now) then
+                value.count = 0
+                touched[key] = true
             end
-            
-            current_item.count = current_count - count
-            normal_items[id] = current_item
-            updated = true
-            items_map[id] = nil
+        elseif is_instance_record(key, value) then
+            local expire_at = to_number(value.expireAt, nil)
+            if expire_at ~= nil and not is_effective(expire_at, now) then
+                value.expired = true
+                touched[key] = true
+            end
+        elseif key == NORMAL_ITEM_KEY and type(value) == "table" then
+            local changed = false
+            for _, item_data in pairs(value) do
+                if type(item_data) == "table" then
+                    local count = to_number(item_data.count, 0)
+                    local has_expire = item_data.hasExpireAt == true
+                    local expire_at = to_number(item_data.expireAt, nil)
+                    if count <= 0 then
+                        item_data.count = 0
+                        changed = true
+                    elseif has_expire and not is_effective(expire_at, now) then
+                        item_data.count = 0
+                        changed = true
+                    end
+                end
+            end
+            if changed then
+                touched[key] = true
+            end
         end
-        
-        if updated then
-            table.insert(storage_writes, {
-                collection = "backpack",
-                key = NORMAL_KEY,
+    end
+end
+
+local function write_objects(user_id, snapshot, touched)
+    local writes = {}
+    for key, _ in pairs(touched) do
+        local obj = snapshot[key]
+        if obj then
+            writes[#writes + 1] = {
+                collection = BACKPACK_COLLECTION,
+                key = key,
                 user_id = user_id,
-                value = normal_items,
+                value = obj.value,
                 version = obj.version,
                 permission_read = 1,
                 permission_write = 1
-            })
+            }
         end
     end
-
-    -- Apply Changes
-    -- 1. Wallet (Atomic check)
-    if next(wallet_changes) ~= nil then
-        local success, err = pcall(nk.wallet_update, user_id, wallet_changes, {}, true)
-        if not success then
-            return false, "Insufficient currency"
-        end
+    if #writes == 0 then
+        return true
     end
-
-    -- 2. Storage
-    if #storage_writes > 0 then
-        nk.storage_write(storage_writes)
+    local ok, err = pcall(nk.storage_write, writes)
+    if not ok then
+        return false, tostring(err)
     end
-
-    local source = log_source
-    if type(source) ~= "string" or source == "" then
-        source = "consume"
-    end
-    -- local delta = aggregate_item_delta(items_to_consume, -1)
-    -- if #delta > 0 then
-    --     pcall(M.write_inventory_log, context, user_id, source, delta, log_ref)
-    -- end
-
     return true
 end
 
--- Helper to check if item is expired
-function M.is_item_expired(item_data)
-    if not item_data then return true end
-    local now = os.time()
-    return item_data.expireAt and now > item_data.expireAt
+local function write_change_record(context, user_id, change_type, source, request_id, item_changes, ref)
+    -- 取消 bag_change_record 的写入
 end
 
--- Helper to get remaining days of item
+local function extract_request_id(context, ref)
+    if type(ref) == "table" then
+        if type(ref.requestId) == "string" and ref.requestId ~= "" then
+            return ref.requestId
+        end
+        if type(ref.request_id) == "string" and ref.request_id ~= "" then
+            return ref.request_id
+        end
+    end
+    if type(context) == "table" and type(context.request_id) == "string" and context.request_id ~= "" then
+        return context.request_id
+    end
+    return nil
+end
+
+local function check_idempotent(user_id, request_id, op_type)
+    if request_id == nil then
+        return false, nil
+    end
+    local objects = nk.storage_read({
+        {
+            collection = IDEMP_COLLECTION,
+            key = request_id,
+            user_id = user_id
+        }
+    })
+    local obj = objects[1]
+    if obj and type(obj.value) == "table" and obj.value.opType == op_type then
+        return true, obj.value.result
+    end
+    return false, nil
+end
+
+local function save_idempotent(user_id, request_id, op_type, result)
+    if request_id == nil then
+        return
+    end
+    pcall(nk.storage_write, {
+        {
+            collection = IDEMP_COLLECTION,
+            key = request_id,
+            user_id = user_id,
+            value = {
+                opType = op_type,
+                result = result or { success = true },
+                savedAt = now_ts()
+            },
+            permission_read = 0,
+            permission_write = 0
+        }
+    })
+end
+
+local function normalize_items(raw_items)
+    if type(raw_items) ~= "table" then
+        return nil, "INVALID_ITEMS"
+    end
+    local out = {}
+    for _, item in ipairs(raw_items) do
+        local item_id = resolve_item_id(item and item.id)
+        local count = to_number(item and item.count, nil)
+        if item_id == nil or count == nil or count <= 0 then
+            return nil, "INVALID_ITEM_PARAM"
+        end
+        local item_cfg = get_item_config(item_id)
+        if not item_cfg then
+            return nil, "ITEM_NOT_FOUND:" .. tostring(item_id)
+        end
+        out[#out + 1] = {
+            id = item_id,
+            count = math.floor(count),
+            expireAt = to_number(item.expireAt, nil),
+            benefitPlanId = item.benefitPlanId
+        }
+    end
+    return out, nil
+end
+
+local function aggregate_inventory(snapshot, now)
+    local counts = {}
+    for key, obj in pairs(snapshot) do
+        local value = obj.value or {}
+        if is_stack_record(value) then
+            local count = to_number(value.count, 0)
+            local has_expire = value.hasExpireAt == true
+            local expire_at = to_number(value.expireAt, nil)
+            if count > 0 and ((not has_expire) or is_effective(expire_at, now)) then
+                counts[value.itemId] = (counts[value.itemId] or 0) + count
+            end
+        elseif is_instance_record(key, value) then
+            local expire_at = to_number(value.expireAt, nil)
+            if is_effective(expire_at, now) then
+                local item_id = value.itemId or key
+                counts[item_id] = (counts[item_id] or 0) + 1
+            end
+        elseif key == NORMAL_ITEM_KEY and type(value) == "table" then
+            for item_id, item_data in pairs(value) do
+                local count = to_number(item_data and item_data.count, 0)
+                local has_expire = item_data and item_data.hasExpireAt == true
+                local expire_at = to_number(item_data and item_data.expireAt, nil)
+                if count > 0 and ((not has_expire) or is_effective(expire_at, now)) then
+                    counts[item_id] = (counts[item_id] or 0) + count
+                end
+            end
+        end
+    end
+    return counts
+end
+
+function M.add_items(context, user_id, items_to_add, log_source, log_ref)
+    local items, err = normalize_items(items_to_add or {})
+    if not items then
+        return false, err
+    end
+    local request_id = extract_request_id(context, log_ref)
+    local idempotent_hit, cached = check_idempotent(user_id, request_id, "grant")
+    if idempotent_hit then
+        local result = cached or { success = true }
+        result.idempotent = true
+        return true, result
+    end
+    local ok, snapshot = load_snapshot(user_id)
+    if not ok then
+        return false, snapshot
+    end
+    local touched = {}
+    local now = now_ts()
+    cleanup_expired(snapshot, now, touched)
+    local slot_capacity = get_slot_capacity()
+    local wallet_changes = {}
+    local required_slots = 0
+    for _, item in ipairs(items) do
+        local item_cfg = get_item_config(item.id)
+        if item_cfg.itemType == "currency" then
+            wallet_changes[item.id] = (wallet_changes[item.id] or 0) + item.count
+        elseif item_cfg.stackable then
+            local normal_obj = get_normal_item_object(snapshot)
+            local normal_map = normal_obj.value
+            local current = normal_map[item.id]
+            if type(current) ~= "table" then
+                current = {
+                    itemId = item.id,
+                    itemType = item_cfg.itemType,
+                    stackable = true,
+                    hasExpireAt = item_cfg.hasExpireAt,
+                    count = 0
+                }
+                normal_map[item.id] = current
+            end
+            local current_count = to_number(current.count, 0)
+            local exists_effective = current_count > 0 and ((current.hasExpireAt ~= true) or is_effective(to_number(current.expireAt, nil), now))
+            if not exists_effective and item_cfg.occupySlot then
+                required_slots = required_slots + 1
+            end
+            current.count = current_count + item.count
+            current.itemType = item_cfg.itemType
+            current.stackable = true
+            current.hasExpireAt = item_cfg.hasExpireAt
+            if item_cfg.hasExpireAt then
+                local expire_at = item.expireAt
+                if expire_at == nil then
+                    return false, "MISSING_EXPIRE_AT:" .. item.id
+                end
+                local old_expire = to_number(current.expireAt, nil)
+                if old_expire == nil then
+                    current.expireAt = expire_at
+                else
+                    current.expireAt = math.max(old_expire, expire_at)
+                end
+            else
+                current.expireAt = nil
+            end
+            touched[NORMAL_ITEM_KEY] = true
+        else
+            local key = (item.id == VIP_ITEM_ID or item.id == SVIP_ITEM_ID) and item.id or ("instance:" .. item.id)
+            local obj = snapshot[key]
+            local current = obj and obj.value or nil
+            local current_expire = current and to_number(current.expireAt, nil) or nil
+            local active = current ~= nil and is_effective(current_expire, now)
+            if not active and item_cfg.occupySlot then
+                required_slots = required_slots + 1
+            end
+            local expire_at = item.expireAt
+            if item_cfg.hasExpireAt and expire_at == nil then
+                if active and current_expire ~= nil then
+                    expire_at = current_expire
+                else
+                    expire_at = now + 30 * 86400
+                end
+            end
+            local next_expire = expire_at
+            if active and current_expire ~= nil and expire_at ~= nil then
+                next_expire = math.max(current_expire, expire_at)
+            end
+            if not obj then
+                obj = {
+                    key = key,
+                    version = nil,
+                    value = {}
+                }
+                snapshot[key] = obj
+            end
+            obj.value = {
+                recordType = "instance",
+                instanceId = (current and current.instanceId) or safe_uuid(),
+                itemId = item.id,
+                type = "time_limited",
+                subType = item.id == VIP_ITEM_ID and "vip" or (item.id == SVIP_ITEM_ID and "svip" or "generic"),
+                description = current and current.description or nil,
+                stackable = false,
+                usable = false,
+                startAt = active and (current.startAt or now) or now,
+                expireAt = next_expire,
+                benefitPlanId = item.benefitPlanId or current and current.benefitPlanId or nil,
+                count = 1
+            }
+            touched[key] = true
+        end
+    end
+
+    local used_slot_count = recalc_used_slots(snapshot, now)
+    if used_slot_count + required_slots > slot_capacity then
+        return false, "BAG_CAPACITY_EXCEEDED"
+    end
+    local wallet_applied = false
+    if next(wallet_changes) ~= nil then
+        local ok_wallet, err_wallet = pcall(nk.wallet_update, user_id, wallet_changes, { source = log_source or "grant" }, true)
+        if not ok_wallet then
+            return false, tostring(err_wallet)
+        end
+        wallet_applied = true
+    end
+
+    local write_ok, write_err = write_objects(user_id, snapshot, touched)
+    if not write_ok then
+        if wallet_applied then
+            local rollback = {}
+            for k, v in pairs(wallet_changes) do
+                rollback[k] = -v
+            end
+            pcall(nk.wallet_update, user_id, rollback, { source = (log_source or "grant") .. "_rollback" }, false)
+        end
+        return false, write_err
+    end
+
+    local result = { success = true, requestId = request_id, idempotent = false }
+    save_idempotent(user_id, request_id, "grant", result)
+    return true, result
+end
+
+function M.consume_items(context, user_id, items_to_consume, log_source, log_ref)
+    local items, err = normalize_items(items_to_consume or {})
+    if not items then
+        return false, err
+    end
+    local request_id = extract_request_id(context, log_ref)
+    local idempotent_hit, cached = check_idempotent(user_id, request_id, "consume")
+    if idempotent_hit then
+        local result = cached or { success = true }
+        result.idempotent = true
+        return true, result
+    end
+    local ok, snapshot = load_snapshot(user_id)
+    if not ok then
+        return false, snapshot
+    end
+    local touched = {}
+    local now = now_ts()
+    cleanup_expired(snapshot, now, touched)
+    local wallet_changes = {}
+    for _, item in ipairs(items) do
+        local item_cfg = get_item_config(item.id)
+        if item_cfg.itemType == "currency" then
+            wallet_changes[item.id] = (wallet_changes[item.id] or 0) - item.count
+        elseif item_cfg.stackable then
+            local required = item.count
+            local candidates = {}
+            local normal_obj = snapshot[NORMAL_ITEM_KEY]
+            if normal_obj and type(normal_obj.value) == "table" then
+                local normal_item = normal_obj.value[item.id]
+                local normal_count = to_number(normal_item and normal_item.count, 0)
+                if normal_count > 0 then
+                    candidates[#candidates + 1] = { key = NORMAL_ITEM_KEY, expireAt = to_number(normal_item.expireAt, nil), count = normal_count, legacy = true }
+                end
+            end
+            local total = 0
+            for _, c in ipairs(candidates) do
+                total = total + c.count
+            end
+            if total < required then
+                return false, "INSUFFICIENT_ITEM:" .. item.id
+            end
+            local remain = required
+            for _, c in ipairs(candidates) do
+                if remain <= 0 then
+                    break
+                end
+                local take = math.min(remain, c.count)
+                if c.legacy then
+                    local legacy_map = snapshot[c.key].value
+                    local legacy_item = legacy_map[item.id]
+                    if legacy_item then
+                        legacy_item.count = to_number(legacy_item.count, 0) - take
+                    end
+                end
+                touched[c.key] = true
+                remain = remain - take
+            end
+        else
+            local key = (item.id == VIP_ITEM_ID or item.id == SVIP_ITEM_ID) and item.id or ("instance:" .. item.id)
+            local obj = snapshot[key]
+            local value = obj and obj.value or nil
+            local expire_at = value and to_number(value.expireAt, nil) or nil
+            local active = value ~= nil and is_effective(expire_at, now)
+            if not active then
+                return false, "INSUFFICIENT_ITEM:" .. item.id
+            end
+            value.expireAt = now
+            value.expired = true
+            touched[key] = true
+        end
+    end
+
+    local wallet_applied = false
+    if next(wallet_changes) ~= nil then
+        local ok_wallet, err_wallet = pcall(nk.wallet_update, user_id, wallet_changes, { source = log_source or "consume" }, true)
+        if not ok_wallet then
+            return false, "INSUFFICIENT_CURRENCY:" .. tostring(err_wallet)
+        end
+        wallet_applied = true
+    end
+
+    local write_ok, write_err = write_objects(user_id, snapshot, touched)
+    if not write_ok then
+        if wallet_applied then
+            local rollback = {}
+            for k, v in pairs(wallet_changes) do
+                rollback[k] = -v
+            end
+            pcall(nk.wallet_update, user_id, rollback, { source = (log_source or "consume") .. "_rollback" }, false)
+        end
+        return false, write_err
+    end
+
+    local result = { success = true, requestId = request_id, idempotent = false }
+    save_idempotent(user_id, request_id, "consume", result)
+    return true, result
+end
+
+function M.cleanup_expired_items(context, user_id, source, ref)
+    local ok, snapshot = load_snapshot(user_id)
+    if not ok then
+        return false, snapshot
+    end
+    local touched = {}
+    local now = now_ts()
+    cleanup_expired(snapshot, now, touched)
+    local write_ok, write_err = write_objects(user_id, snapshot, touched)
+    if not write_ok then
+        return false, write_err
+    end
+    return true, { success = true, cleaned = true }
+end
+
+function M.is_item_expired(item_data)
+    if not item_data then
+        return true
+    end
+    local expire_at = to_number(item_data.expireAt, nil)
+    if expire_at == nil then
+        return false
+    end
+    return expire_at <= now_ts()
+end
+
 function M.get_remaining_days(item_data)
     if not item_data or M.is_item_expired(item_data) then
         return 0
     end
-    local now = os.time()
-    local remaining_seconds = item_data.expireAt - now
-    return math.ceil(remaining_seconds / (24 * 60 * 60))
+    local expire_at = to_number(item_data.expireAt, nil)
+    if expire_at == nil then
+        return 0
+    end
+    local remain = expire_at - now_ts()
+    if remain <= 0 then
+        return 0
+    end
+    return math.ceil(remain / 86400)
 end
 
 function M.rpc_wallet_get(context, payload)
-    -- RPC：获取当前用户 Wallet（货币余额）
-    -- - 请求：payload 可为空
-    -- - 响应：wallet 对象（key 为货币 id，value 为余额）
     local user_id = context.user_id
     local ok, account = pcall(nk.account_get_id, user_id)
     if not ok or account == nil then
-        return nk.json_encode({ error = "Account not found" })
+        return nk.json_encode({ success = false, error = { code = "ACCOUNT_NOT_FOUND", message = "Account not found" } })
     end
-
     local wallet = account.wallet or {}
     if type(wallet) == "string" then
         local decode_ok, decoded = pcall(nk.json_decode, wallet)
-        if decode_ok and decoded ~= nil then
-            wallet = decoded
-        else
-            wallet = {}
-        end
+        wallet = decode_ok and decoded or {}
     end
-
-    return nk.json_encode(wallet)
+    return nk.json_encode({ success = true, wallet = wallet })
 end
 
 function M.rpc_inventory_get_items(context, payload)
-    -- RPC：查询指定物品数量（仅查询 Storage 背包；货币请用 rpc_wallet_get）
-    -- - 请求：{ item_ids: ["id1","id2",...] } 或直接传数组
-    -- - 响应：{ items: [ {id="id1", count=number}, ... ] }（保持请求顺序；未找到返回 0）
-    local decode_ok, req = json_decode_payload(payload)
-    if not decode_ok then
-        return nk.json_encode({ error = "Invalid payload" })
+    local ok_decode, req = decode_payload(payload)
+    if not ok_decode then
+        return nk.json_encode({ success = false, error = { code = "INVALID_PAYLOAD", message = "Invalid payload" } })
     end
-
     local item_ids = req.item_ids or req
     if type(item_ids) ~= "table" then
-        return nk.json_encode({ error = "item_ids must be an array" })
+        item_ids = {}
     end
-
-    local user_id = context.user_id
-    local items = {}
-    local SPECIAL_ITEMS = { ["item_vip_active"] = true, ["item_svip_active"] = true }
-    
-    -- 如果 item_ids 为空，列出所有物品
+    local ok, snapshot = load_snapshot(context.user_id)
+    if not ok then
+        return nk.json_encode({ success = false, error = { code = "LOAD_FAILED", message = snapshot } })
+    end
+    local now = now_ts()
+    local touched = {}
+    cleanup_expired(snapshot, now, touched)
+    local counts = aggregate_inventory(snapshot, now)
+    local out = {}
     if #item_ids == 0 then
-        -- 1. 取特殊物品
-        local ok, objects, _ = pcall(nk.storage_list, user_id, "backpack", 100, nil)
-        if not ok then return nk.json_encode({ error = "Failed to list inventory" }) end
-        
-        for _, obj in ipairs(objects or {}) do
-            if obj.key ~= "normalItem" then
-                local value = obj.value or {}
-                local count = value.count or 0
-                if type(count) ~= "number" then count = tonumber(count) or 0 end
-                table.insert(items, { id = obj.key, count = count, type = value.type })
-            end
+        for item_id, count in pairs(counts) do
+            out[#out + 1] = { id = item_id, count = count }
         end
-        
-        -- 2. 取普通物品 (normalItem)
-        local reads = {{ collection = "backpack", key = "normalItem", user_id = user_id }}
-        local normal_objs = nk.storage_read(reads)
-        if normal_objs[1] and normal_objs[1].value then
-            for id, data in pairs(normal_objs[1].value) do
-                table.insert(items, { id = id, count = data.count or 0, type = data.type })
-            end
-        end
-        
-        return nk.json_encode({ items = items })
-    end
-
-    -- 指定 ID 查询
-    local special_reads = {}
-    local need_normal = false
-    local seen = {}
-
-    for _, item_id in ipairs(item_ids) do
-        if type(item_id) == "string" and item_id ~= "" and not seen[item_id] then
-            seen[item_id] = true
-            if SPECIAL_ITEMS[item_id] then
-                table.insert(special_reads, { collection = "backpack", key = item_id, user_id = user_id })
-            else
-                need_normal = true
-            end
+        table.sort(out, function(a, b) return a.id < b.id end)
+    else
+        for _, raw_id in ipairs(item_ids) do
+            local item_id = resolve_item_id(raw_id) or raw_id
+            out[#out + 1] = { id = item_id, count = counts[item_id] or 0 }
         end
     end
-
-    local counts = {}
-    -- 读取特殊物品
-    if #special_reads > 0 then
-        local objects = nk.storage_read(special_reads)
-        for _, obj in ipairs(objects) do
-            local value = obj.value or {}
-            local count = value.count or 0
-            if type(count) ~= "number" then count = tonumber(count) or 0 end
-            counts[obj.key] = count
-        end
-    end
-    
-    -- 读取普通物品
-    if need_normal then
-        local reads = {{ collection = "backpack", key = "normalItem", user_id = user_id }}
-        local objects = nk.storage_read(reads)
-        if objects[1] and objects[1].value then
-            local normal_items = objects[1].value
-            for _, item_id in ipairs(item_ids) do
-                if not SPECIAL_ITEMS[item_id] and normal_items[item_id] then
-                    counts[item_id] = normal_items[item_id].count or 0
-                end
-            end
-        end
-    end
-
-    for _, item_id in ipairs(item_ids) do
-        if type(item_id) == "string" and item_id ~= "" then
-            table.insert(items, { id = item_id, count = counts[item_id] or 0 })
-        end
-    end
-
-    return nk.json_encode({ items = items })
+    return nk.json_encode({
+        success = true,
+        items = out
+    })
 end
 
 function M.rpc_inventory_list(context, payload)
-    -- RPC：列出背包（Storage(collection="backpack") 全量分页）
-    -- - 请求：{ page_size|limit: number, cursor?: string }
-    -- - 响应：{ items: [ {id=key, count=number, type=string}, ... ], cursor: next_cursor }
-    local decode_ok, req = json_decode_payload(payload)
-    if not decode_ok then
-        return nk.json_encode({ error = "Invalid payload" })
+    local ok_decode, req = decode_payload(payload)
+    if not ok_decode then
+        return nk.json_encode({ success = false, error = { code = "INVALID_PAYLOAD", message = "Invalid payload" } })
     end
-
-    local limit = tonumber(req.page_size or req.limit) or 100
+    local limit = to_number(req.page_size or req.limit, 100)
     if limit < 1 then
         limit = 1
     elseif limit > 1000 then
         limit = 1000
     end
-
-    local cursor = req.cursor
-    if cursor ~= nil and type(cursor) ~= "string" then
-        cursor = nil
-    end
-
-    local user_id = context.user_id
-    local ok, objects, next_cursor = pcall(nk.storage_list, user_id, "backpack", limit, cursor)
+    local ok, snapshot = load_snapshot(context.user_id)
     if not ok then
-        ok, objects, next_cursor = pcall(nk.storage_list, "backpack", user_id, limit, cursor)
+        return nk.json_encode({ success = false, error = { code = "LOAD_FAILED", message = snapshot } })
     end
-    if not ok then
-        return nk.json_encode({ error = tostring(objects) })
-    end
-
+    local now = now_ts()
+    local touched = {}
+    cleanup_expired(snapshot, now, touched)
     local items = {}
-    for _, obj in ipairs(objects or {}) do
+    for key, obj in pairs(snapshot) do
         local value = obj.value or {}
-        local count = value.count or 0
-        if type(count) ~= "number" then
-            count = tonumber(count) or 0
-        end
-        table.insert(items, { id = obj.key, count = count, type = value.type })
-    end
-
-    return nk.json_encode({ items = items, cursor = next_cursor })
-end
-
-local function is_inventory_log_admin(context, req)
-    -- inventory_log 管理权限判定：
-    -- - admin_token：与 config.admin.inventory_log_admin_token 完全匹配则放行
-    -- - 白名单：context.user_id 在 config.admin.inventory_log_user_whitelist 中则放行
-    local admin = config.admin or {}
-    local expected = admin.inventory_log_admin_token
-    local token = req.admin_token
-    if type(expected) == "string" and expected ~= "" and type(token) == "string" and token ~= "" and token == expected then
-        return true
-    end
-
-    local wl = admin.inventory_log_user_whitelist
-    local uid = context and context.user_id
-    if type(wl) == "table" and type(uid) == "string" and uid ~= "" then
-        for _, v in ipairs(wl) do
-            if v == uid then
-                return true
+        if is_stack_record(value) then
+            local count = to_number(value.count, 0)
+            local expire_at = to_number(value.expireAt, nil)
+            if count > 0 and ((value.hasExpireAt ~= true) or is_effective(expire_at, now)) then
+                items[#items + 1] = {
+                    key = key,
+                    id = value.itemId,
+                    count = count,
+                    itemType = value.itemType,
+                    stackable = true,
+                    hasExpireAt = value.hasExpireAt == true,
+                    expireAt = expire_at
+                }
+            end
+        elseif key == NORMAL_ITEM_KEY and type(value) == "table" then
+            for item_id, item_data in pairs(value) do
+                local count = to_number(item_data and item_data.count, 0)
+                local expire_at = to_number(item_data and item_data.expireAt, nil)
+                local has_expire_at = item_data and item_data.hasExpireAt == true
+                if count > 0 and ((not has_expire_at) or is_effective(expire_at, now)) then
+                    items[#items + 1] = {
+                        key = NORMAL_ITEM_KEY,
+                        id = item_id,
+                        count = count,
+                        itemType = item_data and item_data.itemType or nil,
+                        stackable = true,
+                        hasExpireAt = has_expire_at,
+                        expireAt = expire_at,
+                    }
+                end
+            end
+        elseif is_instance_record(key, value) then
+            local expire_at = to_number(value.expireAt, nil)
+            if is_effective(expire_at, now) then
+                items[#items + 1] = {
+                    key = key,
+                    id = value.itemId or key,
+                    count = 1,
+                    itemType = "time_limited",
+                    stackable = false,
+                    hasExpireAt = expire_at ~= nil,
+                    expireAt = expire_at,
+                    instanceId = value.instanceId
+                }
             end
         end
     end
-
-    return false
-end
-
-local function normalize_item_id_filter(req)
-    local item_id = req.item_id or req.itemId
-    if type(item_id) == "string" then
-        if item_id == "" then
-            return nil
-        end
-        return { item_id }, true
+    table.sort(items, function(a, b) return a.id < b.id end)
+    local out = {}
+    for i = 1, math.min(limit, #items) do
+        out[#out + 1] = items[i]
     end
-    if type(item_id) == "table" then
-        local out = {}
-        local seen = {}
-        for _, v in ipairs(item_id) do
-            if type(v) == "string" and v ~= "" and not seen[v] then
-                seen[v] = true
-                table.insert(out, v)
-            end
-        end
-        if #out == 0 then
-            return nil
-        end
-        return out, true
-    end
-
-    local item_ids = req.item_ids or req.itemIds
-    if type(item_ids) == "table" then
-        local out = {}
-        local seen = {}
-        for _, v in ipairs(item_ids) do
-            if type(v) == "string" and v ~= "" and not seen[v] then
-                seen[v] = true
-                table.insert(out, v)
-            end
-        end
-        if #out == 0 then
-            return nil
-        end
-        return out, true
-    end
-
-    return nil
-end
-
-local function matches_item_filter(items, item_set)
-    if item_set == nil then
-        return true
-    end
-    if type(items) ~= "table" then
-        return false
-    end
-    for _, it in ipairs(items) do
-        local id = it and it.id
-        if type(id) == "string" and item_set[id] then
-            return true
-        end
-    end
-    return false
+    return nk.json_encode({
+        success = true,
+        items = out,
+        cursor = nil
+    })
 end
 
 function M.rpc_inventory_log_list(context, payload)
-    -- RPC：查询背包变更流水（Storage(collection="inventory_log") 分页 + 服务端过滤）
-    --
-    -- 权限：
-    -- - 默认只能查自己（target_user_id/user_id 缺省为 context.user_id）
-    -- - 若查询他人，则必须通过 is_inventory_log_admin 校验，否则返回 {error="forbidden"}
-    --
-    -- 请求字段（支持多种别名，便于兼容不同客户端）：
-    -- - page_size|limit：单页数量（1..1000）
-    -- - cursor：分页游标
-    -- - start_ts|from_ts|ts_start|start：起始时间戳（秒，含）
-    -- - end_ts|to_ts|ts_end|end：结束时间戳（秒，含）
-    -- - source：按写入时的 value.source 精确匹配过滤
-    -- - item_id|itemId：单个物品 id
-    -- - item_ids|itemIds：多个物品 id（数组）
-    -- - user_id|target_user_id：目标用户（缺省为自己）
-    -- - admin_token：管理员令牌（用于跨用户查询）
-    --
-    -- 响应字段：
-    -- - logs：{ key, user_id, source, items, ref, ts_utc, ts }
-    -- - cursor：下一页游标（为空表示结束）
-    --
-    -- 实现说明：
-    -- - 先按 storage_list 取日志，再在服务端做 source/时间范围/item 过滤；
-    --   过滤可能导致“取回的对象不足 limit”，因此最多循环 50 次补齐（防止长时间扫描）。
-    local decode_ok, req = json_decode_payload(payload)
-    if not decode_ok then
-        return nk.json_encode({ error = "Invalid payload" })
+    return nk.json_encode({ success = true, logs = {}, cursor = nil })
+end
+
+function M.rpc_backpack_grant(context, payload)
+    local ok_decode, req = decode_payload(payload)
+    if not ok_decode then
+        return nk.json_encode({ success = false, error = { code = "INVALID_PAYLOAD", message = "Invalid payload" } })
     end
-
-    local limit = tonumber(req.page_size or req.limit) or 100
-    if limit < 1 then
-        limit = 1
-    elseif limit > 1000 then
-        limit = 1000
+    local items = req.items or {}
+    local source = req.source or "rpc_backpack_grant"
+    local ref = req.ref or {}
+    if req.requestId ~= nil and ref.requestId == nil then
+        ref.requestId = req.requestId
     end
-
-    local cursor = req.cursor
-    if cursor ~= nil and type(cursor) ~= "string" then
-        cursor = nil
+    local ok, result_or_err = M.add_items(context, context.user_id, items, source, ref)
+    if not ok then
+        return nk.json_encode({ success = false, error = { code = "GRANT_FAILED", message = tostring(result_or_err) } })
     end
+    return nk.json_encode({ success = true, result = result_or_err })
+end
 
-    local start_ts = req.start_ts or req.from_ts or req.ts_start or req.start
-    if start_ts ~= nil then
-        start_ts = tonumber(start_ts)
-        if start_ts == nil then
-            return nk.json_encode({ error = "start_ts must be a number" })
-        end
+function M.rpc_backpack_consume(context, payload)
+    local ok_decode, req = decode_payload(payload)
+    if not ok_decode then
+        return nk.json_encode({ success = false, error = { code = "INVALID_PAYLOAD", message = "Invalid payload" } })
     end
-
-    local end_ts = req.end_ts or req.to_ts or req.ts_end or req["end"]
-    if end_ts ~= nil then
-        end_ts = tonumber(end_ts)
-        if end_ts == nil then
-            return nk.json_encode({ error = "end_ts must be a number" })
-        end
+    local items = req.items or {}
+    local source = req.source or "rpc_backpack_consume"
+    local ref = req.ref or {}
+    if req.requestId ~= nil and ref.requestId == nil then
+        ref.requestId = req.requestId
     end
-
-    if start_ts ~= nil and end_ts ~= nil and start_ts > end_ts then
-        return nk.json_encode({ error = "start_ts must be <= end_ts" })
+    local ok, result_or_err = M.consume_items(context, context.user_id, items, source, ref)
+    if not ok then
+        return nk.json_encode({ success = false, error = { code = "CONSUME_FAILED", message = tostring(result_or_err) } })
     end
+    return nk.json_encode({ success = true, result = result_or_err })
+end
 
-    local source = req.source
-    if source ~= nil and type(source) ~= "string" then
-        return nk.json_encode({ error = "source must be a string" })
+function M.rpc_backpack_use(context, payload)
+    return M.rpc_backpack_consume(context, payload)
+end
+
+function M.rpc_backpack_cleanup(context, payload)
+    local ok, result_or_err = M.cleanup_expired_items(context, context.user_id, "rpc_backpack_cleanup", {})
+    if not ok then
+        return nk.json_encode({ success = false, error = { code = "CLEANUP_FAILED", message = tostring(result_or_err) } })
     end
-    if source == "" then
-        source = nil
-    end
+    return nk.json_encode({ success = true, result = result_or_err })
+end
 
-    local item_ids = normalize_item_id_filter(req)
-    local item_set = nil
-    if item_ids ~= nil then
-        item_set = {}
-        for _, v in ipairs(item_ids) do
-            item_set[v] = true
-        end
-    end
-
-    local target_user_id = req.user_id or req.target_user_id or context.user_id
-    if type(target_user_id) ~= "string" or target_user_id == "" then
-        return nk.json_encode({ error = "user_id is required" })
-    end
-
-    if target_user_id ~= context.user_id and not is_inventory_log_admin(context, req) then
-        return nk.json_encode({ error = "forbidden" })
-    end
-
-    local logs = {}
-    local next_cursor = cursor
-    local rounds = 0
-    while #logs < limit do
-        rounds = rounds + 1
-        if rounds > 50 then
-            break
-        end
-
-        local remaining = limit - #logs
-        local ok, objects, c = pcall(nk.storage_list, target_user_id, "inventory_log", remaining, next_cursor)
-        if not ok then
-            ok, objects, c = pcall(nk.storage_list, "inventory_log", target_user_id, remaining, next_cursor)
-        end
-        if not ok then
-            return nk.json_encode({ error = tostring(objects) })
-        end
-
-        for _, obj in ipairs(objects or {}) do
-            local value = obj.value or {}
-            local include = true
-
-            if source ~= nil and value.source ~= source then
-                include = false
-            end
-
-            local ts = value.ts
-            if ts ~= nil and type(ts) ~= "number" then
-                ts = tonumber(ts)
-            end
-
-            if include and start_ts ~= nil and (ts == nil or ts < start_ts) then
-                include = false
-            end
-
-            if include and end_ts ~= nil and (ts == nil or ts > end_ts) then
-                include = false
-            end
-
-            if include and not matches_item_filter(value.items, item_set) then
-                include = false
-            end
-
-            if include then
-                table.insert(logs, {
-                    key = obj.key,
-                    user_id = obj.user_id or target_user_id,
-                    source = value.source,
-                    items = value.items,
-                    ref = value.ref,
-                    ts_utc = value.ts_utc,
-                    ts = ts
-                })
-            end
-        end
-
-        next_cursor = c
-        if next_cursor == nil or next_cursor == "" then
-            break
-        end
-        if objects == nil or #objects == 0 then
-            break
-        end
-    end
-
-    return nk.json_encode({ logs = logs, cursor = next_cursor })
+function M.rpc_backpack_get_state(context, payload)
+    return nk.json_encode({
+        success = true,
+        state = nil,
+        message = "BACKPACK_STATE_REMOVED"
+    })
 end
 
 return M

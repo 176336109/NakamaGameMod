@@ -28,3 +28,8 @@
 - [ ] Task 6: Verification
   - [ ] Run all tests in `CheckinServiceTests.cs`.
   - [ ] Verify "RPC cancelled" error is gone (should be fixed by proper Lua implementation).
+
+- [ ] Task 7: Repair checklist gaps found in verification
+  - [ ] Add missing "Final Result Verification" blocks to every remaining checkin test case.
+  - [ ] Execute full `CheckinServiceTests.cs` in CI/Unity runner and attach pass evidence.
+  - [ ] Investigate and fix any remaining "RPC cancelled" failure if it appears during rerun.
