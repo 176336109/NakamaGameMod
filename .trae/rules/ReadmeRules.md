@@ -1,6 +1,6 @@
 ---
 alwaysApply: false
-description: 
+description: 关于Readme编写规则
 ---
 # Readme编写规则
 

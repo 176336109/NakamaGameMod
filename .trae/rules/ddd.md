@@ -1,3 +1,7 @@
+---
+alwaysApply: false
+description: 关于Nakama的Lua模组编码规范
+---
 # 关于Nakama的Lua模组编码规范,DDD范式
 
 ## 目录
