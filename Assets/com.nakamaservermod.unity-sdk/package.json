@@ -14,12 +14,7 @@
     "sdk",
     "rpc"
   ],
-  "samples": [
-    {
-      "displayName": "最小示例",
-      "description": "用于初始化/登录/签到/抽卡与 IAP 校验的最小 MonoBehaviour 示例。",
-      "path": "Samples~/MinimalSamples"
-    }
-  ],
-  "dependencies": {}
+  "dependencies": {
+    "com.heroiclabs.nakama-unity": "3.21.1"
+  }
 }
