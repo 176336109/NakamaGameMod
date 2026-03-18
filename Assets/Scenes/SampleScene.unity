@@ -442,6 +442,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1375651171}
   - component: {fileID: 1375651172}
+  - component: {fileID: 1375651173}
   m_Layer: 0
   m_Name: _Ctrl
   m_TagString: Untagged
@@ -471,7 +472,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1375651170}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 1c11af5df337fb84ca3c5d8a33e3999e, type: 3}
   m_Name: 
@@ -485,6 +486,23 @@ MonoBehaviour:
   create: 1
   bannerId: standard
   gachaCount: 1
+--- !u!114 &1375651173
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1375651170}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4b9b3b6c1054c2c47b69396806285c24, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: NakamaServerMod.UnitySdk.Runtime::NakamaServerMod.UnitySdk.LoginNakama
+  userName: fish
+  host: 127.0.0.1
+  port: 7350
+  serverKey: defaultkey
+  ssl: 0
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
