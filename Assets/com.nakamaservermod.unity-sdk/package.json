@@ -1,6 +1,6 @@
 {
   "name": "com.nakamaservermod.unity-sdk",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "displayName": "NakamaServerMod Unity SDK",
   "description": "面向 NakamaServerMod RPC 的 Unity 客户端 SDK 封装。",
   "unity": "2022.3",
