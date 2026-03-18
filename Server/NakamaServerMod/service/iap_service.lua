@@ -1,4 +1,5 @@
 local nk = require("nakama")
+local config = require("config")
 
 local M = {}
 local iap_domain = nil
@@ -106,6 +107,83 @@ function M.rpc_pay_callback(context, payload)
     else
         return nk.json_encode({ success = false, error = "Failed to process purchase rewards" })
     end
+end
+
+function M.rpc_create_order(context, payload)
+    nk.logger_info("RPC create_order called. Payload: " .. (payload or "nil"))
+
+    local status, decoded = pcall(nk.json_decode, payload)
+    if not status or not decoded then
+        return nk.json_encode({ success = false, error = "Invalid payload" })
+    end
+
+    local product_id = decoded.product_id
+    local provider = decoded.provider or "mock"
+
+    if not product_id then
+        return nk.json_encode({ success = false, error = "Missing product_id" })
+    end
+
+    local user_id = context.user_id
+    if not user_id then
+        return nk.json_encode({ success = false, error = "User not found" })
+    end
+
+    -- Call PayGateway to create order
+    local url = config.paygateway_api_url .. "/v1/orders"
+    local headers = {
+        ["Content-Type"] = "application/json",
+        ["Accept"] = "application/json"
+    }
+    local body = nk.json_encode({
+        app_id = "nakama_game",
+        user_id = user_id,
+        product_id = product_id,
+        amount = 100, -- In real world, look up price from config.iap_products
+        currency = "CNY",
+        provider = provider,
+        subject = "IAP Purchase: " .. product_id
+    })
+
+    local success, code, headers, response = pcall(nk.http_request, url, "POST", headers, body)
+    if not success or code >= 400 then
+        nk.logger_error("Failed to create order in PayGateway: " .. (response or "unknown"))
+        return nk.json_encode({ success = false, error = "Failed to create order" })
+    end
+
+    return response -- Return the PayGateway response (contains order_id, pay_url, etc.)
+end
+
+function M.rpc_mock_pay(context, payload)
+    nk.logger_info("RPC mock_pay called. Payload: " .. (payload or "nil"))
+
+    local status, decoded = pcall(nk.json_decode, payload)
+    if not status or not decoded then
+        return nk.json_encode({ success = false, error = "Invalid payload" })
+    end
+
+    local order_id = decoded.order_id
+    if not order_id then
+        return nk.json_encode({ success = false, error = "Missing order_id" })
+    end
+
+    -- Call PayGateway Mock Notify
+    local url = config.paygateway_api_url .. "/v1/providers/mock/notify"
+    local headers = {
+        ["Content-Type"] = "application/json"
+    }
+    local body = nk.json_encode({
+        order_id = order_id,
+        status = "SUCCESS"
+    })
+
+    local success, code, headers, response = pcall(nk.http_request, url, "POST", headers, body)
+    if not success or code >= 400 then
+        nk.logger_error("Failed to call mock notify: " .. (response or "unknown"))
+        return nk.json_encode({ success = false, error = "Failed to mock pay" })
+    end
+
+    return nk.json_encode({ success = true, msg = "Mock payment triggered" })
 end
 
 return M

@@ -271,4 +271,6 @@ M.admin = {
     inventory_log_user_whitelist = {}
 }
 
+M.paygateway_api_url = "http://host.docker.internal:8080"
+
 return M

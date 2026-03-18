@@ -20,3 +20,6 @@ providers:
     base_url: "https://api.example.com"
     notify_expect_body: "ok"
     notify_path: "/v1/providers/myprovider/notify"
+
+  - name: "mock"
+    notify_path: "/v1/providers/mock/notify"

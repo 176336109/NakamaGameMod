@@ -7,6 +7,7 @@ import (
 	"paygateway/internal/provider"
 	custom_provider "paygateway/internal/provider/custom"
 	gopay_provider "paygateway/internal/provider/gopay"
+	mock_provider "paygateway/internal/provider/mock"
 	"paygateway/internal/repo"
 	"paygateway/internal/service"
 	"paygateway/pkg/config"
@@ -61,6 +62,9 @@ func main() {
 			provider.Register(p)
 		case "myprovider":
 			p := custom_provider.NewMyProvider(pCfg)
+			provider.Register(p)
+		case "mock":
+			p := mock_provider.NewMockProvider(pCfg)
 			provider.Register(p)
 		}
 	}

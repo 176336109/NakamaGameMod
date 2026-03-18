@@ -81,5 +81,7 @@ nk.register_rpc(shop_service.rpc_shop_buy, "shop_buy")
 -- end, "ValidatePurchaseApple")
 
 nk.register_rpc(iap_service.rpc_pay_callback, "pay_callback")
+nk.register_rpc(iap_service.rpc_create_order, "create_order")
+nk.register_rpc(iap_service.rpc_mock_pay, "mock_pay")
 
 nk.logger_info("----> [NakamaServerMod] All RPCs registered OK <----")

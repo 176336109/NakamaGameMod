@@ -1,0 +1,45 @@
+@nakama_host = http://localhost:7350
+@server_key = defaultkey
+@user_id = test_user_mock_flow_001
+
+### 1. Authenticate to get Session Token
+# @name auth
+POST {{nakama_host}}/v2/account/authenticate/custom?create=true&username={{user_id}}
+Authorization: Basic {{server_key}}:
+Content-Type: application/json
+
+{
+    "id": "{{user_id}}"
+}
+
+### Capture Token
+@token = {{auth.response.body.token}}
+
+### 2. Create Order via RPC
+# @name create_order
+POST {{nakama_host}}/v2/rpc/create_order
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+"{\"product_id\": \"gold_pack_1\", \"provider\": \"mock\"}"
+
+### Capture Order ID
+# Note: The RPC returns a JSON string in "payload".
+# The payload itself is a JSON string of the PayGateway response.
+# For manual testing, copy the order_id from the response payload.
+# Example response: {"payload": "{\"OrderID\":\"...\", ...}"}
+
+### 3. Mock Pay via RPC (Replace ORDER_ID manually or via script if possible)
+@order_id = 8cf04c7f-52a0-4a95-9bcd-e9c8038914f9
+POST {{nakama_host}}/v2/rpc/mock_pay
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+"{\"order_id\": \"{{order_id}}\"}"
+
+### 4. Verify Wallet (Optional)
+POST {{nakama_host}}/v2/rpc/wallet_get
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+"{}"
