@@ -31,6 +31,9 @@ local VIP_ITEM_ID = "item_vip_active"
 local SVIP_ITEM_ID = "item_svip_active"
 
 local ITEM_ALIAS = {
+    ["1"] = "gold",
+    ["2"] = "gem",
+    ["金币"] = "gold",
     ["crystal"] = "gem",
     ["item_crystal"] = "gem",
     ["水晶"] = "gem"
@@ -114,11 +117,30 @@ local function get_item_config(item_id)
     local max_stack_count = to_number(item_def.max_stack, 999999999)
     return {
         itemId = item_id,
+        itemName = item_def.name or item_id,
+        itemDesc = item_def.itemDesc or ((item_def.name or item_id) .. "说明"),
         itemType = item_def.type,
         stackable = stackable,
         hasExpireAt = has_expire_at,
         occupySlot = occupy_slot,
         maxStackCount = max_stack_count
+    }
+end
+
+local function build_item_definition(item_id)
+    local item_cfg = get_item_config(item_id)
+    if not item_cfg then
+        return nil
+    end
+    return {
+        itemId = item_cfg.itemId,
+        itemName = item_cfg.itemName,
+        itemDesc = item_cfg.itemDesc,
+        itemType = item_cfg.itemType,
+        stackable = item_cfg.stackable,
+        hasExpireAt = item_cfg.hasExpireAt,
+        maxStackCount = item_cfg.maxStackCount,
+        occupySlot = item_cfg.occupySlot
     }
 end
 
@@ -823,6 +845,20 @@ end
 
 function M.rpc_inventory_log_list(context, payload)
     return nk.json_encode({ success = true, logs = {}, cursor = nil })
+end
+
+function M.rpc_inventory_get_item_defs(context, payload)
+    local out = {}
+    local item_defs = config.items or {}
+    for raw_item_id, _ in pairs(item_defs) do
+        local item_id = tostring(raw_item_id)
+        local item_def = build_item_definition(item_id)
+        if item_def ~= nil then
+            out[#out + 1] = item_def
+        end
+    end
+    table.sort(out, function(a, b) return a.itemId < b.itemId end)
+    return nk.json_encode({ success = true, items = out })
 end
 
 function M.rpc_backpack_grant(context, payload)
