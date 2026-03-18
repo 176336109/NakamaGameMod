@@ -180,6 +180,19 @@ namespace NakamaServerMod.UnitySdk
     }
 
     [Serializable]
+    public class InventoryItemDef
+    {
+        public string itemId;
+        public string itemName;
+        public string itemDesc;
+        public string itemType;
+        public bool stackable;
+        public bool hasExpireAt;
+        public long maxStackCount;
+        public bool occupySlot;
+    }
+
+    [Serializable]
     public class InventoryListResponse
     {
         public bool success;
@@ -187,6 +200,31 @@ namespace NakamaServerMod.UnitySdk
         public List<InventoryListItem> items;
         public string cursor;
         public InventoryState state;
+    }
+
+    [Serializable]
+    public class InventoryItemDefsResponse
+    {
+        public bool success;
+        public RpcError error;
+        public List<InventoryItemDef> items;
+    }
+
+    [Serializable]
+    public class InventoryAllInfoRequest
+    {
+        public int page_size;
+        public int limit;
+    }
+
+    [Serializable]
+    public class InventoryAllInfoResponse
+    {
+        public bool success;
+        public RpcError error;
+        public List<InventoryItemDef> itemDefs;
+        public List<InventoryListItem> backpackItems;
+        public string cursor;
     }
 
     [Serializable]
