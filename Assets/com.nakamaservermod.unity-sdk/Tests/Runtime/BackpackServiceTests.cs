@@ -248,6 +248,42 @@ namespace NakamaServerMod.UnitySdk.Tests
             Assert.AreEqual(2, items.items[0].count);
         }
 
+        // 用例说明：获取全部物品配置应返回成功且包含已知配置项。
+        [Test]
+        public async Task C13_GetAllItemDefs_ReturnsConfiguredItems()
+        {
+            var client = await CreateAuthenticatedClientAsync("背包_C13_获取全部物品配置");
+            var response = await client.RpcAsync<InventoryItemDefsResponse>("inventory_get_item_defs");
+
+            Assert.IsTrue(response.success, response.error?.message);
+            Assert.IsNotNull(response.items);
+            Assert.IsTrue(response.items.Count > 0);
+
+            var hourglassDef = response.items.FirstOrDefault(x => x.itemId == "010300001");
+            Assert.IsNotNull(hourglassDef);
+            Assert.AreEqual("item", hourglassDef.itemType);
+        }
+
+        // 用例说明：获取背包全部物品应返回成功并包含当前账号已发放道具。
+        [Test]
+        public async Task C14_GetAllBackpackItems_ReturnsGrantedItems()
+        {
+            var client = await CreateAuthenticatedClientAsync("背包_C14_获取背包全部物品");
+            var service = new InventoryService(client);
+            var grant = await service.GrantAsync(CreateGrantRequest("010300001", 2));
+            Assert.IsTrue(grant.success, grant.error?.message);
+
+            var response = await client.RpcAsync<InventoryAllInfoRequest, InventoryAllInfoResponse>(
+                "inventory_get_all_info",
+                new InventoryAllInfoRequest { page_size = 100, limit = 100 });
+
+            Assert.IsTrue(response.success, response.error?.message);
+            Assert.IsNotNull(response.backpackItems);
+            var item = response.backpackItems.FirstOrDefault(x => x.id == "010300001");
+            Assert.IsNotNull(item);
+            Assert.AreEqual(2, item.count);
+        }
+
         // 用例说明：满包时给已有堆叠物品加数量（当前环境跳过）。
         [Test]
         public void B01_FullBag_AddExistingStackable()

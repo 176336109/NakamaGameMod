@@ -6,6 +6,8 @@ namespace NakamaServerMod.UnitySdk
 {
     public class LoginNakama : MonoBehaviour
     {
+        public static LoginNakama Instance { get; private set; }
+
         public string userName = "";
         public string host = "127.0.0.1";
         public int port = 7350;
@@ -16,8 +18,25 @@ namespace NakamaServerMod.UnitySdk
         public string LastError { get; private set; }
         public bool IsLoggedIn => Client != null && Client.HasSession;
 
+        private void Awake()
+        {
+            if (Instance != null && Instance != this)
+            {
+                Destroy(gameObject);
+                return;
+            }
+
+            Instance = this;
+            DontDestroyOnLoad(gameObject);
+        }
+
         private async void Start()
         {
+            if (Instance != this)
+            {
+                return;
+            }
+
             await LoginAsync(GetDeviceId(), userName);
         }
 
