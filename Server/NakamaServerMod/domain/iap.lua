@@ -11,8 +11,12 @@
 ]]
 local nk = require("nakama")
 local config = require("config")
-local backpack = require("domain.backpack")
 local M = {}
+local backpack_gateway = nil
+
+function M.set_item_gateway(gateway)
+    backpack_gateway = gateway
+end
 
 -- 发货主流程：在平台校验通过后执行，负责道具/权益发放与订阅状态写入
 function M.on_purchase_complete(context, purchase)
@@ -39,7 +43,13 @@ function M.on_purchase_complete(context, purchase)
         if purchase.store ~= nil then ref.store = purchase.store end
         if purchase.transaction_id ~= nil then ref.transaction_id = purchase.transaction_id end
         if purchase.environment ~= nil then ref.environment = purchase.environment end
-        local ok, err = backpack.add_items(context, user_id, product_config.rewards, "iap", ref)
+        
+        if not backpack_gateway then
+            nk.logger_error("backpack_gateway not wired in iap domain")
+            return false
+        end
+
+        local ok, err = backpack_gateway.add_items(context, user_id, product_config.rewards, "iap", ref)
         if not ok then
             -- 异常分支：发货失败，拒绝提交该笔交易，避免出现“交易记录已写入但未发货”的不一致
             -- 日志字段语义：tostring(err) 由 backpack 返回，通常包含失败原因/堆栈/下游错误描述

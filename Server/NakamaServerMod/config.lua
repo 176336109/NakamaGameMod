@@ -36,9 +36,9 @@ M.gacha = {
         cost_item = "gem",
         cost_amount = 100,
         pool = {
-            { item_id = "hero_ssr_001", weight = 20, rarity = "SSR" },
-            { item_id = "hero_sr_001", weight = 180, rarity = "SR" },
-            { item_id = "hero_r_001", weight = 800, rarity = "R" },
+            { item_id = "hero_ssr_001", weight = 20,  rarity = "SSR" },
+            { item_id = "hero_sr_001",  weight = 180, rarity = "SR" },
+            { item_id = "hero_r_001",   weight = 800, rarity = "R" },
         },
         pity_ssr = 90,
         pity_sr = 10,
@@ -67,7 +67,7 @@ M.benefit_plans = {
         immediateItems = { { id = "item_diamond", count = 300 } },
         dailyItems = {
             { id = "item_diamond", count = 60 },
-            { id = "010300001", count = 3 }
+            { id = "010300001",    count = 3 }
         },
         privileges = {
             reviveLimit = 3,
@@ -103,53 +103,83 @@ M.shop = {
     goods = {
         -- 特惠商店（Special Shop）
         ["SHOP_SKILL_GREEN_5"] = {
-            shopType = "special", displayMode = "random", weight = 100,
-            costType = "gold", costValue = 200,
-            limitType = "per_refresh", limitValue = 1,
+            shopType = "special",
+            displayMode = "random",
+            weight = 100,
+            costType = "gold",
+            costValue = 200,
+            limitType = "per_refresh",
+            limitValue = 1,
             rewardItems = { { id = "020100001", count = 5 } }
         },
         ["SHOP_SKILL_BLUE_3"] = {
-            shopType = "special", displayMode = "random", weight = 50,
-            costType = "gold", costValue = 400,
-            limitType = "per_refresh", limitValue = 1,
+            shopType = "special",
+            displayMode = "random",
+            weight = 50,
+            costType = "gold",
+            costValue = 400,
+            limitType = "per_refresh",
+            limitValue = 1,
             rewardItems = { { id = "020200001", count = 3 } }
         },
         ["SHOP_SKILL_PURPLE_1"] = {
-            shopType = "special", displayMode = "random", weight = 10,
-            costType = "item_diamond", costValue = 15,
-            limitType = "per_refresh", limitValue = 1,
+            shopType = "special",
+            displayMode = "random",
+            weight = 10,
+            costType = "item_diamond",
+            costValue = 15,
+            limitType = "per_refresh",
+            limitValue = 1,
             rewardItems = { { id = "020300001", count = 1 } }
         },
         ["SHOP_MOD_GREEN_5"] = {
-            shopType = "special", displayMode = "random", weight = 100,
-            costType = "gold", costValue = 200,
-            limitType = "per_refresh", limitValue = 1,
+            shopType = "special",
+            displayMode = "random",
+            weight = 100,
+            costType = "gold",
+            costValue = 200,
+            limitType = "per_refresh",
+            limitValue = 1,
             rewardItems = { { id = "030100001", count = 5 } }
         },
         ["SHOP_MOD_BLUE_3"] = {
-            shopType = "special", displayMode = "random", weight = 50,
-            costType = "gold", costValue = 400,
-            limitType = "per_refresh", limitValue = 1,
+            shopType = "special",
+            displayMode = "random",
+            weight = 50,
+            costType = "gold",
+            costValue = 400,
+            limitType = "per_refresh",
+            limitValue = 1,
             rewardItems = { { id = "030200001", count = 3 } }
         },
         ["SHOP_TIMESAND_1"] = {
-            shopType = "special", displayMode = "random", weight = 20,
-            costType = "item_diamond", costValue = 5,
-            limitType = "per_refresh", limitValue = 1,
+            shopType = "special",
+            displayMode = "random",
+            weight = 20,
+            costType = "item_diamond",
+            costValue = 5,
+            limitType = "per_refresh",
+            limitValue = 1,
             rewardItems = { { id = "010300001", count = 1 } }
         },
-        
+
         -- 固定展示限购商品
         ["SHOP_SKILL_GOLD_WEEK"] = {
-            shopType = "special", displayMode = "fixed",
-            costType = "item_diamond", costValue = 30,
-            limitType = "weekly", limitValue = 1,
+            shopType = "special",
+            displayMode = "fixed",
+            costType = "item_diamond",
+            costValue = 30,
+            limitType = "weekly",
+            limitValue = 1,
             rewardItems = { { id = "020300001", count = 1 } } -- 示例配置，实际可能变化
         },
         ["SHOP_GROWTH_GIFT_PERM"] = {
-            shopType = "special", displayMode = "fixed",
-            costType = "item_diamond", costValue = 30,
-            limitType = "permanent", limitValue = 1,
+            shopType = "special",
+            displayMode = "fixed",
+            costType = "item_diamond",
+            costValue = 30,
+            limitType = "permanent",
+            limitValue = 1,
             rewardItems = { { id = "gold", count = 500 }, { id = "010300001", count = 2 } }
         },
 
@@ -165,33 +195,48 @@ M.shop = {
 
         -- 金币商店（Gold Shop）
         ["GOLD_001"] = {
-            shopType = "gold", displayMode = "exchange",
-            costType = "item_diamond", costValue = 1,
-            limitType = "none", limitValue = 0,
+            shopType = "gold",
+            displayMode = "exchange",
+            costType = "item_diamond",
+            costValue = 1,
+            limitType = "none",
+            limitValue = 0,
             rewardItems = { { id = "gold", count = 25 } }
         },
         ["GOLD_002"] = {
-            shopType = "gold", displayMode = "exchange",
-            costType = "item_diamond", costValue = 10,
-            limitType = "daily", limitValue = 1,
+            shopType = "gold",
+            displayMode = "exchange",
+            costType = "item_diamond",
+            costValue = 10,
+            limitType = "daily",
+            limitValue = 1,
             rewardItems = { { id = "gold", count = 250 } }
         },
         ["GOLD_003"] = {
-            shopType = "gold", displayMode = "exchange",
-            costType = "item_diamond", costValue = 50,
-            limitType = "daily", limitValue = 1,
+            shopType = "gold",
+            displayMode = "exchange",
+            costType = "item_diamond",
+            costValue = 50,
+            limitType = "daily",
+            limitValue = 1,
             rewardItems = { { id = "gold", count = 1300 } }
         },
         ["GOLD_004"] = {
-            shopType = "gold", displayMode = "exchange",
-            costType = "item_diamond", costValue = 100,
-            limitType = "daily", limitValue = 1,
+            shopType = "gold",
+            displayMode = "exchange",
+            costType = "item_diamond",
+            costValue = 100,
+            limitType = "daily",
+            limitValue = 1,
             rewardItems = { { id = "gold", count = 2800 } }
         },
         ["GOLD_005"] = {
-            shopType = "gold", displayMode = "exchange",
-            costType = "item_diamond", costValue = 500,
-            limitType = "daily", limitValue = 1,
+            shopType = "gold",
+            displayMode = "exchange",
+            costType = "item_diamond",
+            costValue = 500,
+            limitType = "daily",
+            limitValue = 1,
             rewardItems = { { id = "gold", count = 15000 } }
         },
     }
@@ -199,6 +244,9 @@ M.shop = {
 
 -- 内购商品配置（SKU -> 奖励/时长）
 M.iap_products = {
+    ["gold_pack_1"] = {
+        rewards = { { id = "gold", count = 100 } }
+    },
     ["com.game.gem_pack_1"] = {
         rewards = { { id = "gem", count = 100 } }
     },

@@ -10,6 +10,7 @@ local checkin_service = require("service.checkin_service")
 local gacha_service = require("service.gacha_service")
 local shop_service = require("service.shop_service")
 local vip_svip_service = require("service.vip_svip_service")
+local iap_service = require("service.iap_service")
 
 -- NakamaMod/main.lua
 -- Nakama Lua runtime 使用顶层代码直接注册 RPC，不需要 InitModule / initializer。
@@ -21,6 +22,7 @@ checkin_service.wire_item_gateway(backpack, checkin)
 gacha_service.wire_item_gateway(backpack, gacha)
 shop_service.wire_item_gateway(backpack, shop)
 vip_svip_service.wire_item_gateway(backpack, vip_svip)
+iap_service.wire_item_gateway(backpack, iap)
 
 -- 1) Backpack RPCs
 nk.register_rpc(backpack_service.rpc_debug_add_items, "debug_add_items")
@@ -77,5 +79,7 @@ nk.register_rpc(shop_service.rpc_shop_buy, "shop_buy")
 --         end
 --     end
 -- end, "ValidatePurchaseApple")
+
+nk.register_rpc(iap_service.rpc_pay_callback, "pay_callback")
 
 nk.logger_info("----> [NakamaServerMod] All RPCs registered OK <----")

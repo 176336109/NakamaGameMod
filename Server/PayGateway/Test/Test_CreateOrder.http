@@ -1,11 +1,17 @@
+@user_id = 37a572dc-69f2-492d-ba68-ffd1e3eb6c8e
 POST http://localhost:8080/v1/orders
 Content-Type: application/json
 
 {
     "app_id": "game_001",
-    "user_id": "user_123",
+    "user_id": "{{user_id}}",
     "product_id": "gold_pack_1",
     "amount": 100,
     "currency": "CNY",
     "provider": "myprovider"
 }
+
+### 变量说明：
+# 请在 VS Code 的 settings.json 或 .vscode/settings.json 中配置 rest-client.environmentVariables
+# 或者在请求上方使用 @user_id = xxxx 临时覆盖
+# 这里的 user_id 必须是 Nakama 数据库中真实存在的用户 UUID，否则 Nakama 处理回调时会因为找不到用户而报错。

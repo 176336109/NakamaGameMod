@@ -45,6 +45,7 @@ type ProviderConfig struct {
 type BusinessConfig struct {
 	NakamaNotifyURL string `yaml:"nakama_notify_url"`
 	NakamaServerKey string `yaml:"nakama_server_key"` // Optional: for auth
+	NakamaApiURL    string `yaml:"nakama_api_url"`
 	SignSecret      string `yaml:"sign_secret"`
 }
 

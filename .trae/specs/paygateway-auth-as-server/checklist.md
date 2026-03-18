@@ -1,0 +1,5 @@
+- [x] `config.yaml` uses `server_key`.
+- [x] `PayService` successfully authenticates as `pay_gateway_system_user`.
+- [x] `PayService` caches the session token.
+- [x] `notifyBusiness` calls RPC using `Bearer` token.
+- [x] `notifyBusiness` automatically refreshes token on 401 error.
