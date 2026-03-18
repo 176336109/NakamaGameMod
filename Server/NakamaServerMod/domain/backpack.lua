@@ -763,24 +763,7 @@ function M.rpc_inventory_get_items(context, payload)
     })
 end
 
-function M.rpc_inventory_list(context, payload)
-    local ok_decode, req = decode_payload(payload)
-    if not ok_decode then
-        return nk.json_encode({ success = false, error = { code = "INVALID_PAYLOAD", message = "Invalid payload" } })
-    end
-    local limit = to_number(req.page_size or req.limit, 100)
-    if limit < 1 then
-        limit = 1
-    elseif limit > 1000 then
-        limit = 1000
-    end
-    local ok, snapshot = load_snapshot(context.user_id)
-    if not ok then
-        return nk.json_encode({ success = false, error = { code = "LOAD_FAILED", message = snapshot } })
-    end
-    local now = now_ts()
-    local touched = {}
-    cleanup_expired(snapshot, now, touched)
+local function collect_backpack_items(snapshot, now, limit)
     local items = {}
     for key, obj in pairs(snapshot) do
         local value = obj.value or {}
@@ -836,6 +819,28 @@ function M.rpc_inventory_list(context, payload)
     for i = 1, math.min(limit, #items) do
         out[#out + 1] = items[i]
     end
+    return out
+end
+
+function M.rpc_inventory_list(context, payload)
+    local ok_decode, req = decode_payload(payload)
+    if not ok_decode then
+        return nk.json_encode({ success = false, error = { code = "INVALID_PAYLOAD", message = "Invalid payload" } })
+    end
+    local limit = to_number(req.page_size or req.limit, 100)
+    if limit < 1 then
+        limit = 1
+    elseif limit > 1000 then
+        limit = 1000
+    end
+    local ok, snapshot = load_snapshot(context.user_id)
+    if not ok then
+        return nk.json_encode({ success = false, error = { code = "LOAD_FAILED", message = snapshot } })
+    end
+    local now = now_ts()
+    local touched = {}
+    cleanup_expired(snapshot, now, touched)
+    local out = collect_backpack_items(snapshot, now, limit)
     return nk.json_encode({
         success = true,
         items = out,
@@ -859,6 +864,43 @@ function M.rpc_inventory_get_item_defs(context, payload)
     end
     table.sort(out, function(a, b) return a.itemId < b.itemId end)
     return nk.json_encode({ success = true, items = out })
+end
+
+function M.rpc_inventory_get_all_info(context, payload)
+    local ok_decode, req = decode_payload(payload)
+    if not ok_decode then
+        return nk.json_encode({ success = false, error = { code = "INVALID_PAYLOAD", message = "Invalid payload" } })
+    end
+    local limit = to_number(req.page_size or req.limit, 1000)
+    if limit < 1 then
+        limit = 1
+    elseif limit > 10000 then
+        limit = 10000
+    end
+    local ok, snapshot = load_snapshot(context.user_id)
+    if not ok then
+        return nk.json_encode({ success = false, error = { code = "LOAD_FAILED", message = snapshot } })
+    end
+    local now = now_ts()
+    local touched = {}
+    cleanup_expired(snapshot, now, touched)
+    local backpack_items = collect_backpack_items(snapshot, now, limit)
+    local item_defs = {}
+    local defs = config.items or {}
+    for raw_item_id, _ in pairs(defs) do
+        local item_id = tostring(raw_item_id)
+        local item_def = build_item_definition(item_id)
+        if item_def ~= nil then
+            item_defs[#item_defs + 1] = item_def
+        end
+    end
+    table.sort(item_defs, function(a, b) return a.itemId < b.itemId end)
+    return nk.json_encode({
+        success = true,
+        itemDefs = item_defs,
+        backpackItems = backpack_items,
+        cursor = nil
+    })
 end
 
 function M.rpc_backpack_grant(context, payload)

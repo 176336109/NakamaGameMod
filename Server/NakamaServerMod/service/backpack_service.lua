@@ -62,6 +62,13 @@ function M.rpc_inventory_get_item_defs(context, payload)
     return backpack_domain.rpc_inventory_get_item_defs(context, payload)
 end
 
+function M.rpc_inventory_get_all_info(context, payload)
+    if not service_ready() then
+        return fail("BACKPACK_SERVICE_NOT_WIRED", "Backpack service not wired")
+    end
+    return backpack_domain.rpc_inventory_get_all_info(context, payload)
+end
+
 function M.rpc_inventory_log_list(context, payload)
     if not service_ready() then
         return fail("BACKPACK_SERVICE_NOT_WIRED", "Backpack service not wired")
