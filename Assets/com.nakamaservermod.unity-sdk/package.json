@@ -15,6 +15,6 @@
     "rpc"
   ],
   "dependencies": {
-    "com.heroiclabs.nakama-unity": "3.21.1"
+    
   }
 }
