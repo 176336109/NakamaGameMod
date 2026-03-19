@@ -102,12 +102,13 @@ local function get_item_config(item_id)
         return nil
     end
     local is_currency = item_def.type == "currency"
+    local is_entitlement = item_def.type == "entitlement"
     local is_vip_like = item_id == VIP_ITEM_ID or item_id == SVIP_ITEM_ID
-    local stackable = not is_vip_like and not is_currency
-    if item_def.max_stack ~= nil and tonumber(item_def.max_stack) == 1 and item_def.type == "time_limited" then
+    local stackable = not is_vip_like and not is_currency and not is_entitlement
+    if item_def.max_stack ~= nil and tonumber(item_def.max_stack) == 1 and (item_def.type == "time_limited" or item_def.type == "entitlement") then
         stackable = false
     end
-    local has_expire_at = is_vip_like or item_def.type == "time_limited"
+    local has_expire_at = is_vip_like or is_entitlement or item_def.type == "time_limited"
     local occupy_slot = not is_currency
     local max_stack_count = to_number(item_def.max_stack, 999999999)
     return {
@@ -525,7 +526,7 @@ function M.add_items(context, user_id, items_to_add, log_source, log_ref)
                 recordType = "instance",
                 instanceId = (current and current.instanceId) or safe_uuid(),
                 itemId = item.id,
-                type = "time_limited",
+                type = "entitlement",
                 subType = item.id == VIP_ITEM_ID and "vip" or (item.id == SVIP_ITEM_ID and "svip" or "generic"),
                 description = current and current.description or nil,
                 stackable = false,
@@ -838,7 +839,7 @@ local function collect_backpack_items(snapshot, now, limit, item_type_filter)
             local expire_at = to_number(value.expireAt, nil)
             if is_effective(expire_at, now) then
                 local item_id = value.itemId or key
-                local item_type, item_name, item_desc = get_item_meta(item_id, "time_limited")
+                local item_type, item_name, item_desc = get_item_meta(item_id, "entitlement")
                 if item_type_matches(item_type_filter, item_type) then
                 items[#items + 1] = {
                     key = key,
