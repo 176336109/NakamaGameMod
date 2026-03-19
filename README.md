@@ -9,7 +9,7 @@
 - **GameClient**：管理客户端生命周期，作为各项子服务的入口。
 - **抽卡系统 (GachaService)**：支持发起抽卡请求、获取抽卡结果、记录保底状态（`PityState`）。
 - **每日签到系统 (CheckinService)**：基于 28 天周期的签到逻辑，支持状态获取、日常领奖（含额外奖励）以及漏签补签（`CheckinMakeup`）。
-- **背包与物品系统 (InventoryService)**：管理玩家的物品栈（`ItemStack`）及资产变更验证。
+- **背包与物品系统 (BackpackService)**：管理玩家的物品栈（`ItemStack`）及资产变更验证。
 - **内购系统 (IapService)**：对接 Nakama 的 Apple/Google 票据校验机制，并在校验成功后触发服务器安全发货。
 - **调试工具 (DebugAddItems)**：提供在开发环境下的快捷物品发放接口。
 

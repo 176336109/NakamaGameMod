@@ -1,11 +1,120 @@
+local nk = require("nakama")
 local M = {}
+
+local function read_file_text(path)
+    if type(nk) == "table" and type(nk.file_read) == "function" then
+        local ok_read_nk, text_nk = pcall(nk.file_read, path)
+        if ok_read_nk and type(text_nk) == "string" and text_nk ~= "" then
+            return text_nk
+        end
+        local win_path = string.gsub(path, "/", "\\")
+        if win_path ~= path then
+            local ok_read_nk_win, text_nk_win = pcall(nk.file_read, win_path)
+            if ok_read_nk_win and type(text_nk_win) == "string" and text_nk_win ~= "" then
+                return text_nk_win
+            end
+        end
+    end
+    if type(io) ~= "table" or type(io.open) ~= "function" then
+        return nil
+    end
+    local ok_open, file = pcall(io.open, path, "r")
+    if not ok_open then
+        return nil
+    end
+    if file == nil then
+        return nil
+    end
+    local ok_read, text = pcall(file.read, file, "*a")
+    pcall(file.close, file)
+    if not ok_read then
+        return nil
+    end
+    return text
+end
+
+local function build_json_paths(file_name)
+    local source_dir = nil
+    if type(debug) == "table" and type(debug.getinfo) == "function" then
+        local ok_info, info = pcall(debug.getinfo, 1, "S")
+        if ok_info and type(info) == "table" and type(info.source) == "string" then
+            local source = info.source
+            if source:sub(1, 1) == "@" then
+                source = source:sub(2)
+            end
+            source_dir = source:match("^(.*[\\/])[^\\/]-$")
+        end
+    end
+    local paths = {
+        "data/" .. file_name,
+        "./data/" .. file_name,
+        "data/modules/data/" .. file_name,
+        "./data/modules/data/" .. file_name,
+        "data\\modules\\data\\" .. file_name,
+        ".\\data\\modules\\data\\" .. file_name,
+        "modules/data/" .. file_name,
+        "./modules/data/" .. file_name,
+        "Server/NakamaServerMod/data/" .. file_name
+    }
+    if source_dir ~= nil then
+        paths[#paths + 1] = source_dir .. "data/" .. file_name
+        paths[#paths + 1] = source_dir .. "../data/" .. file_name
+    end
+    return paths
+end
+
+local function load_json_file(file_name)
+    local paths = build_json_paths(file_name)
+    for _, path in ipairs(paths) do
+        local text = read_file_text(path)
+        if text ~= nil and text ~= "" then
+            local ok, decoded = pcall(nk.json_decode, text)
+            if ok and type(decoded) == "table" then
+                if type(nk.logger_info) == "function" then
+                    nk.logger_info("Loaded " .. file_name .. " from path: " .. path)
+                end
+                return decoded
+            end
+        end
+    end
+    return nil
+end
+
+local function load_items_from_json()
+    local decoded = load_json_file("items.json")
+    if decoded ~= nil and type(decoded.items) == "table" then
+        return decoded.items
+    end
+    return nil
+end
+
+local function ensure_item_desc(items)
+    for item_id, item_def in pairs(items or {}) do
+        if type(item_def) == "table" and item_def.itemDesc == nil then
+            item_def.itemDesc = (item_def.name or tostring(item_id) or "item") .. "说明"
+        end
+    end
+end
+
+local function normalize_number_key_table(data)
+    local out = {}
+    for k, v in pairs(data or {}) do
+        local nkv = tonumber(k)
+        if nkv ~= nil then
+            out[nkv] = v
+        else
+            out[k] = v
+        end
+    end
+    return out
+end
 
 -- NakamaMod/config.lua
 -- 职责：集中存放 Mod 的静态配置数据（道具、抽卡、签到、内购商品、管理端参数等）。
 -- 使用方式：业务模块通过 require("config") 读取本表；本文件不应包含运行时逻辑。
 
 -- 道具/货币/角色定义表
-M.items = {
+local fallback_items = {
     ["1"] = { type = "currency", name = "金币", itemDesc = "金币说明" },
     ["2"] = { type = "currency", name = "水晶", itemDesc = "水晶说明" },
     ["gold"] = { type = "currency", name = "金币", itemDesc = "金币说明" },
@@ -20,18 +129,26 @@ M.items = {
     ["hero_sr_001"] = { type = "hero", name = "SR Archer", itemDesc = "SR Archer说明", rarity = "SR" },
     ["hero_r_001"] = { type = "hero", name = "R Soldier", itemDesc = "R Soldier说明", rarity = "R" },
     ["010300001"] = { type = "item", name = "时光沙漏", itemDesc = "时光沙漏说明", max_stack = 9999 },
-    ["020100001"] = { type = "item", name = "技能碎片", itemDesc = "技能碎片说明", max_stack = 999 },
-    ["020200001"] = { type = "item", name = "技能碎片", itemDesc = "技能碎片说明", max_stack = 999 },
-    ["020300001"] = { type = "item", name = "技能碎片", itemDesc = "技能碎片说明", max_stack = 999 },
-    ["020400001"] = { type = "item", name = "技能碎片", itemDesc = "技能碎片说明", max_stack = 999 },
-    ["020500001"] = { type = "item", name = "技能碎片", itemDesc = "技能碎片说明", max_stack = 999 },
-    ["030100001"] = { type = "item", name = "改装件碎片", itemDesc = "改装件碎片说明", max_stack = 999 },
-    ["030200001"] = { type = "item", name = "改装件碎片", itemDesc = "改装件碎片说明", max_stack = 999 },
-    ["030300001"] = { type = "item", name = "改装件碎片", itemDesc = "改装件碎片说明", max_stack = 999 },
-    ["030400001"] = { type = "item", name = "改装件碎片", itemDesc = "改装件碎片说明", max_stack = 999 },
-    ["030500001"] = { type = "item", name = "改装件碎片", itemDesc = "改装件碎片说明", max_stack = 999 },
+    ["020100001"] = { type = "item", name = "技能碎片1", itemDesc = "技能碎片说明", max_stack = 999 },
+    ["020200001"] = { type = "item", name = "技能碎片2", itemDesc = "技能碎片说明", max_stack = 999 },
+    ["020300001"] = { type = "item", name = "技能碎片3", itemDesc = "技能碎片说明", max_stack = 999 },
+    ["020400001"] = { type = "item", name = "技能碎片4", itemDesc = "技能碎片说明", max_stack = 999 },
+    ["020500001"] = { type = "item", name = "技能碎片5", itemDesc = "技能碎片说明", max_stack = 999 },
+    ["030100001"] = { type = "item", name = "改装件碎片6", itemDesc = "改装件碎片说明", max_stack = 999 },
+    ["030200001"] = { type = "item", name = "改装件碎片7", itemDesc = "改装件碎片说明", max_stack = 999 },
+    ["030300001"] = { type = "item", name = "改装件碎片8", itemDesc = "改装件碎片说明", max_stack = 999 },
+    ["030400001"] = { type = "item", name = "改装件碎片9", itemDesc = "改装件碎片说明", max_stack = 999 },
+    ["030500001"] = { type = "item", name = "改装件碎片10", itemDesc = "改装件碎片说明", max_stack = 999 },
     ["PACK_GROWTH_001"] = { type = "item", name = "Growth Gift Pack", itemDesc = "Growth Gift Pack说明", max_stack = 1 },
 }
+
+M.items = load_items_from_json()
+if M.items == nil then
+    local has_nk_file_read = type(nk) == "table" and type(nk.file_read) == "function"
+    local has_io_open = type(io) == "table" and type(io.open) == "function"
+    error("FAILED_TO_LOAD_ITEMS_JSON: items.json not found/readable; nk.file_read=" .. tostring(has_nk_file_read) .. ", io.open=" .. tostring(has_io_open))
+end
+ensure_item_desc(M.items)
 
 M.backpack = {
     slot_capacity = 100
@@ -271,6 +388,26 @@ M.iap_products = {
         benefit_plan_id = "svip_monthly"
     }
 }
+
+local shop_json = load_json_file("shop.json")
+if shop_json == nil or type(shop_json.goods) ~= "table" or type(shop_json.refresh_cost) ~= "table" then
+    error("FAILED_TO_LOAD_SHOP_JSON: shop.json not found/readable or invalid")
+end
+M.shop = shop_json
+
+local vip_json = load_json_file("vip.json")
+if vip_json == nil or type(vip_json.benefit_plans) ~= "table" or type(vip_json.iap_products) ~= "table" then
+    error("FAILED_TO_LOAD_VIP_JSON: vip.json not found/readable or invalid")
+end
+M.benefit_plans = vip_json.benefit_plans
+M.iap_products = vip_json.iap_products
+
+local checkin_json = load_json_file("checkin.json")
+if checkin_json == nil or type(checkin_json.rewards) ~= "table" or type(checkin_json.makeup_cost) ~= "table" then
+    error("FAILED_TO_LOAD_CHECKIN_JSON: checkin.json not found/readable or invalid")
+end
+M.checkin = checkin_json
+M.checkin.rewards = normalize_number_key_table(M.checkin.rewards)
 
 -- 管理端相关配置
 M.admin = {

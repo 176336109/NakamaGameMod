@@ -29,7 +29,7 @@ namespace NakamaServerMod.UnitySdk.Tests
         {
             var client = await CreateAuthenticatedClientAsync("购买VIP测试");
             var vipService = new VipService(client);
-            var inventoryService = new InventoryService(client);
+            var inventoryService = new BackpackService(client);
 
             // 购买 VIP
             var purchaseResult = await vipService.PurchaseVipAsync();
@@ -74,7 +74,7 @@ namespace NakamaServerMod.UnitySdk.Tests
         {
             var client = await CreateAuthenticatedClientAsync("购买SVIP测试");
             var vipService = new VipService(client);
-            var inventoryService = new InventoryService(client);
+            var inventoryService = new BackpackService(client);
 
             // 购买 SVIP
             var purchaseResult = await vipService.PurchaseSvipAsync();
@@ -133,7 +133,7 @@ namespace NakamaServerMod.UnitySdk.Tests
         {
             var client = await CreateAuthenticatedClientAsync("一键领取测试");
             var vipService = new VipService(client);
-            var inventoryService = new InventoryService(client);
+            var inventoryService = new BackpackService(client);
 
             // 购买 VIP 和 SVIP
             await vipService.PurchaseVipAsync();
