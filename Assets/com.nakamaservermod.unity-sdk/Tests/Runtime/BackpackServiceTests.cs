@@ -263,7 +263,7 @@ namespace NakamaServerMod.UnitySdk.Tests
 
             var hourglassDef = response.items.FirstOrDefault(x => x.itemId == "010300001");
             Assert.IsNotNull(hourglassDef);
-            Assert.AreEqual("item", hourglassDef.itemType);
+            Assert.AreEqual("special", hourglassDef.itemType);
         }
 
         // 用例说明：获取背包全部物品应返回成功并包含当前账号已发放道具。
@@ -304,12 +304,12 @@ namespace NakamaServerMod.UnitySdk.Tests
             await service.GrantAsync(CreateGrantRequest("010300001", 1));
             await service.GrantAsync(CreateGrantRequest("item_vip_active", 1, NowTs() + 3600));
 
-            var response = await service.GetAllInfoAsync(new InventoryAllInfoRequest { page_size = 100, limit = 100, item_type = "item" });
+            var response = await service.GetAllInfoAsync(new InventoryAllInfoRequest { page_size = 100, limit = 100, item_type = "special" });
 
             Assert.IsTrue(response.success, response.error?.message);
             Assert.IsNotNull(response.backpackItems);
             Assert.IsTrue(response.backpackItems.Count > 0);
-            Assert.IsTrue(response.backpackItems.All(x => x.itemType == "item"));
+            Assert.IsTrue(response.backpackItems.All(x => x.itemType == "special"));
             Assert.IsTrue(response.backpackItems.Any(x => x.id == "010300001"));
             Assert.IsFalse(response.backpackItems.Any(x => x.id == "item_vip_active"));
             Assert.IsTrue(response.backpackItems.All(x => !string.IsNullOrEmpty(x.itemName)));

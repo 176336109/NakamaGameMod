@@ -35,6 +35,9 @@
         }
     },
     "iap_products": {
+        "gold_pack_1": {
+            "rewards": [ { "id": "gold", "count": 100 } ]
+        },
         "com.game.gem_pack_1": {
             "rewards": [ { "id": "gem", "count": 100 } ]
         },
