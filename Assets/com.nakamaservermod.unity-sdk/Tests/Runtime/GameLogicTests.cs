@@ -55,7 +55,7 @@ namespace NakamaServerMod.UnitySdk.Tests
             var client = await CreateAuthenticatedClientAsync();
 
             // 1. 先通过 Debug 接口增加代币，以免报 Insufficient currency 错误
-            var inventoryService = new InventoryService(client);
+            var inventoryService = new BackpackService(client);
             var itemsToAdd = new List<ItemStack>
             {
                 new ItemStack { id = "gem", count = 10000 },

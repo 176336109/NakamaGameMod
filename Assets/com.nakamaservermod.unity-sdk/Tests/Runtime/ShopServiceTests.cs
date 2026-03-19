@@ -28,7 +28,7 @@ namespace NakamaServerMod.UnitySdk.Tests
 
         private async Task<Dictionary<string, long>> GetWalletAsync(GameClient client)
         {
-            var inventoryService = new InventoryService(client);
+            var inventoryService = new BackpackService(client);
             var response = await inventoryService.GetWalletAsync();
             return response?.wallet ?? new Dictionary<string, long>();
         }
@@ -429,7 +429,7 @@ namespace NakamaServerMod.UnitySdk.Tests
         {
             var client = await CreateAuthenticatedClientAsync("B15_多奖励结算");
             var shopService = new ShopService(client);
-            var inventoryService = new InventoryService(client);
+            var inventoryService = new BackpackService(client);
             await SeedFundsAsync(client);
 
             var walletBefore = await GetWalletAsync(client);

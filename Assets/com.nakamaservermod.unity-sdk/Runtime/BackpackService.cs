@@ -6,11 +6,11 @@ using System.Threading.Tasks;
 
 namespace NakamaServerMod.UnitySdk
 {
-    public sealed class InventoryService
+    public sealed class BackpackService
     {
         private readonly GameClient _client;
 
-        public InventoryService(GameClient client)
+        public BackpackService(GameClient client)
         {
             _client = client ?? throw new ArgumentNullException(nameof(client));
         }
@@ -40,12 +40,13 @@ namespace NakamaServerMod.UnitySdk
             return _client.RpcAsync<InventoryGetItemsRequest, InventoryItemsResponse>("inventory_get_items", request, cancellationToken);
         }
 
-        public Task<InventoryListResponse> ListAsync(int pageSize = 100, string cursor = null, CancellationToken cancellationToken = default)
+        public Task<InventoryListResponse> ListAsync(int pageSize = 100, string cursor = null, string itemType = null, CancellationToken cancellationToken = default)
         {
             var request = new InventoryListRequest
             {
                 page_size = pageSize,
-                cursor = cursor
+                cursor = cursor,
+                item_type = itemType
             };
             return _client.RpcAsync<InventoryListRequest, InventoryListResponse>("inventory_list", request, cancellationToken);
         }
@@ -86,6 +87,16 @@ namespace NakamaServerMod.UnitySdk
         public Task<BackpackGetStateResponse> GetBackpackStateAsync(CancellationToken cancellationToken = default)
         {
             return _client.RpcAsync<BackpackGetStateResponse>("backpack_get_state", cancellationToken);
+        }
+
+        public Task<InventoryItemDefsResponse> GetItemDefsAsync(CancellationToken cancellationToken = default)
+        {
+            return _client.RpcAsync<InventoryItemDefsResponse>("inventory_get_item_defs", cancellationToken);
+        }
+
+        public Task<InventoryAllInfoResponse> GetAllInfoAsync(InventoryAllInfoRequest request, CancellationToken cancellationToken = default)
+        {
+            return _client.RpcAsync<InventoryAllInfoRequest, InventoryAllInfoResponse>("inventory_get_all_info", request ?? new InventoryAllInfoRequest(), cancellationToken);
         }
 
         private static void ValidateMutationRequest(BackpackMutationRequest request)

@@ -30,15 +30,6 @@ local NORMAL_ITEM_KEY = "normalItem"
 local VIP_ITEM_ID = "item_vip_active"
 local SVIP_ITEM_ID = "item_svip_active"
 
-local ITEM_ALIAS = {
-    ["1"] = "gold",
-    ["2"] = "gem",
-    ["金币"] = "gold",
-    ["crystal"] = "gem",
-    ["item_crystal"] = "gem",
-    ["水晶"] = "gem"
-}
-
 local function safe_uuid()
     if nk.uuid_v4 ~= nil then
         local ok, value = pcall(nk.uuid_v4)
@@ -76,10 +67,14 @@ local function decode_payload(payload)
 end
 
 local function resolve_item_id(item_id)
-    if type(item_id) ~= "string" or item_id == "" then
+    if item_id == nil then
         return nil
     end
-    return ITEM_ALIAS[item_id] or item_id
+    local normalized = tostring(item_id)
+    if normalized == "" then
+        return nil
+    end
+    return normalized
 end
 
 local function is_effective(expire_at, now)
@@ -763,7 +758,38 @@ function M.rpc_inventory_get_items(context, payload)
     })
 end
 
-local function collect_backpack_items(snapshot, now, limit)
+local function normalize_item_type_filter(v)
+    if v == nil then
+        return nil
+    end
+    local s = tostring(v)
+    if s == "" then
+        return nil
+    end
+    return s
+end
+
+local function item_type_matches(filter_type, item_type)
+    if filter_type == nil then
+        return true
+    end
+    return item_type == filter_type
+end
+
+local function get_item_meta(item_id, fallback_type)
+    local item_cfg = get_item_config(item_id)
+    local item_type = fallback_type
+    local item_name = item_id
+    local item_desc = ""
+    if item_cfg ~= nil then
+        item_type = item_cfg.itemType or item_type
+        item_name = item_cfg.itemName or item_name
+        item_desc = item_cfg.itemDesc or item_desc
+    end
+    return item_type, item_name, item_desc
+end
+
+local function collect_backpack_items(snapshot, now, limit, item_type_filter)
     local items = {}
     for key, obj in pairs(snapshot) do
         local value = obj.value or {}
@@ -771,15 +797,20 @@ local function collect_backpack_items(snapshot, now, limit)
             local count = to_number(value.count, 0)
             local expire_at = to_number(value.expireAt, nil)
             if count > 0 and ((value.hasExpireAt ~= true) or is_effective(expire_at, now)) then
+                local item_type, item_name, item_desc = get_item_meta(value.itemId, value.itemType)
+                if item_type_matches(item_type_filter, item_type) then
                 items[#items + 1] = {
                     key = key,
                     id = value.itemId,
                     count = count,
-                    itemType = value.itemType,
+                    itemType = item_type,
+                    itemName = item_name,
+                    itemDesc = item_desc,
                     stackable = true,
                     hasExpireAt = value.hasExpireAt == true,
-                    expireAt = expire_at
+                    expireAt = expire_at or 0
                 }
+                end
             end
         elseif key == NORMAL_ITEM_KEY and type(value) == "table" then
             for item_id, item_data in pairs(value) do
@@ -787,30 +818,41 @@ local function collect_backpack_items(snapshot, now, limit)
                 local expire_at = to_number(item_data and item_data.expireAt, nil)
                 local has_expire_at = item_data and item_data.hasExpireAt == true
                 if count > 0 and ((not has_expire_at) or is_effective(expire_at, now)) then
+                    local item_type, item_name, item_desc = get_item_meta(item_id, item_data and item_data.itemType or nil)
+                    if item_type_matches(item_type_filter, item_type) then
                     items[#items + 1] = {
                         key = NORMAL_ITEM_KEY,
                         id = item_id,
                         count = count,
-                        itemType = item_data and item_data.itemType or nil,
+                        itemType = item_type,
+                        itemName = item_name,
+                        itemDesc = item_desc,
                         stackable = true,
                         hasExpireAt = has_expire_at,
-                        expireAt = expire_at,
+                        expireAt = expire_at or 0,
                     }
+                    end
                 end
             end
         elseif is_instance_record(key, value) then
             local expire_at = to_number(value.expireAt, nil)
             if is_effective(expire_at, now) then
+                local item_id = value.itemId or key
+                local item_type, item_name, item_desc = get_item_meta(item_id, "time_limited")
+                if item_type_matches(item_type_filter, item_type) then
                 items[#items + 1] = {
                     key = key,
-                    id = value.itemId or key,
+                    id = item_id,
                     count = 1,
-                    itemType = "time_limited",
+                    itemType = item_type,
+                    itemName = item_name,
+                    itemDesc = item_desc,
                     stackable = false,
                     hasExpireAt = expire_at ~= nil,
-                    expireAt = expire_at,
+                    expireAt = expire_at or 0,
                     instanceId = value.instanceId
                 }
+                end
             end
         end
     end
@@ -833,6 +875,7 @@ function M.rpc_inventory_list(context, payload)
     elseif limit > 1000 then
         limit = 1000
     end
+    local item_type_filter = normalize_item_type_filter(req.item_type or req.itemType)
     local ok, snapshot = load_snapshot(context.user_id)
     if not ok then
         return nk.json_encode({ success = false, error = { code = "LOAD_FAILED", message = snapshot } })
@@ -840,7 +883,7 @@ function M.rpc_inventory_list(context, payload)
     local now = now_ts()
     local touched = {}
     cleanup_expired(snapshot, now, touched)
-    local out = collect_backpack_items(snapshot, now, limit)
+    local out = collect_backpack_items(snapshot, now, limit, item_type_filter)
     return nk.json_encode({
         success = true,
         items = out,
@@ -877,6 +920,7 @@ function M.rpc_inventory_get_all_info(context, payload)
     elseif limit > 10000 then
         limit = 10000
     end
+    local item_type_filter = normalize_item_type_filter(req.item_type or req.itemType)
     local ok, snapshot = load_snapshot(context.user_id)
     if not ok then
         return nk.json_encode({ success = false, error = { code = "LOAD_FAILED", message = snapshot } })
@@ -884,7 +928,7 @@ function M.rpc_inventory_get_all_info(context, payload)
     local now = now_ts()
     local touched = {}
     cleanup_expired(snapshot, now, touched)
-    local backpack_items = collect_backpack_items(snapshot, now, limit)
+    local backpack_items = collect_backpack_items(snapshot, now, limit, item_type_filter)
     local item_defs = {}
     local defs = config.items or {}
     for raw_item_id, _ in pairs(defs) do

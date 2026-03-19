@@ -164,6 +164,8 @@ namespace NakamaServerMod.UnitySdk
     {
         public int page_size;
         public string cursor;
+        public string item_type;
+        public string itemType;
     }
 
     [Serializable]
@@ -173,6 +175,8 @@ namespace NakamaServerMod.UnitySdk
         public string id;
         public long count;
         public string itemType;
+        public string itemName;
+        public string itemDesc;
         public bool stackable;
         public bool hasExpireAt;
         public long expireAt;
@@ -215,6 +219,8 @@ namespace NakamaServerMod.UnitySdk
     {
         public int page_size;
         public int limit;
+        public string item_type;
+        public string itemType;
     }
 
     [Serializable]

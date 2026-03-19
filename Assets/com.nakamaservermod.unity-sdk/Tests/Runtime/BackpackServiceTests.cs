@@ -14,8 +14,9 @@ namespace NakamaServerMod.UnitySdk.Tests
         {
             var config = ConnectionConfig.Localhost();
             var client = new GameClient(config);
-            var deviceId = $"device_{testName}_{Guid.NewGuid().ToString("N").Substring(0, 8)}";
-            var username = testName;
+            var suffix = Guid.NewGuid().ToString("N").Substring(0, 8);
+            var deviceId = $"device_{testName}_{suffix}";
+            var username = $"{testName}_{suffix}";
             await client.AuthenticateDeviceAsync(deviceId, username);
             return client;
         }
@@ -38,7 +39,7 @@ namespace NakamaServerMod.UnitySdk.Tests
 
         private async Task<WalletGetResponse> GetWalletAsync(GameClient client)
         {
-            return await new InventoryService(client).GetWalletAsync();
+            return await new BackpackService(client).GetWalletAsync();
         }
 
         // 用例说明：发放新可堆叠物品时，数量增加且占格生效。
@@ -46,7 +47,7 @@ namespace NakamaServerMod.UnitySdk.Tests
         public async Task C01_Grant_NewStackable_AddsCountAndSlot()
         {
             var client = await CreateAuthenticatedClientAsync("背包_C01_发放新可堆叠物品");
-            var service = new InventoryService(client);
+            var service = new BackpackService(client);
 
             var grant = await service.GrantAsync(CreateGrantRequest("010300001", 3));
             Assert.IsTrue(grant.success, grant.error?.message);
@@ -61,7 +62,7 @@ namespace NakamaServerMod.UnitySdk.Tests
         public async Task C02_Grant_ExistingStackable_AccumulatesWithoutNewSlot()
         {
             var client = await CreateAuthenticatedClientAsync("背包_C02_已有可堆叠累加");
-            var service = new InventoryService(client);
+            var service = new BackpackService(client);
 
             var first = await service.GrantAsync(CreateGrantRequest("020100001", 2));
             Assert.IsTrue(first.success, first.error?.message);
@@ -85,7 +86,7 @@ namespace NakamaServerMod.UnitySdk.Tests
         public async Task C04_Grant_VipInstance_WritesTimedRecord()
         {
             var client = await CreateAuthenticatedClientAsync("背包_C04_发放VIP时效实例");
-            var service = new InventoryService(client);
+            var service = new BackpackService(client);
             var expireAt = NowTs() + 3600;
 
             var grant = await service.GrantAsync(CreateGrantRequest("item_vip_active", 1, expireAt));
@@ -105,7 +106,7 @@ namespace NakamaServerMod.UnitySdk.Tests
         public async Task C05_Use_Hourglass_DecrementsCount()
         {
             var client = await CreateAuthenticatedClientAsync("背包_C05_使用时光沙漏扣减");
-            var service = new InventoryService(client);
+            var service = new BackpackService(client);
 
             await service.GrantAsync(CreateGrantRequest("010300001", 5));
             var useReq = new BackpackMutationRequest
@@ -125,7 +126,7 @@ namespace NakamaServerMod.UnitySdk.Tests
         public async Task C06_Consume_ToZero_RemovesEffectiveStock()
         {
             var client = await CreateAuthenticatedClientAsync("背包_C06_扣减归零有效库存");
-            var service = new InventoryService(client);
+            var service = new BackpackService(client);
 
             await service.GrantAsync(CreateGrantRequest("020200001", 1));
             var consume = await service.ConsumeAsync(new BackpackMutationRequest
@@ -151,7 +152,7 @@ namespace NakamaServerMod.UnitySdk.Tests
         public async Task C08_Cleanup_ExpiredItems_UpdatesUsableInventory()
         {
             var client = await CreateAuthenticatedClientAsync("背包_C08_过期清理更新库存");
-            var service = new InventoryService(client);
+            var service = new BackpackService(client);
 
             await service.GrantAsync(CreateGrantRequest("item_vip_active", 1, NowTs() - 5));
             var cleanup = await service.CleanupAsync();
@@ -167,7 +168,7 @@ namespace NakamaServerMod.UnitySdk.Tests
         public async Task C09_Renew_Vip_ReusesInstance()
         {
             var client = await CreateAuthenticatedClientAsync("背包_C09_VIP续费复用实例");
-            var service = new InventoryService(client);
+            var service = new BackpackService(client);
 
             var firstExpireAt = NowTs() + 3600;
             var secondExpireAt = firstExpireAt + 7200;
@@ -188,7 +189,7 @@ namespace NakamaServerMod.UnitySdk.Tests
         public async Task C10_Query_EffectiveInventory_ExcludesExpired()
         {
             var client = await CreateAuthenticatedClientAsync("背包_C10_查询有效库存排除过期");
-            var service = new InventoryService(client);
+            var service = new BackpackService(client);
 
             await service.GrantAsync(CreateGrantRequest("item_vip_active", 1, NowTs() - 2));
             await service.GrantAsync(CreateGrantRequest("010300001", 2));
@@ -205,7 +206,7 @@ namespace NakamaServerMod.UnitySdk.Tests
         public async Task C11_BatchGrant_MixedItems_Succeeds()
         {
             var client = await CreateAuthenticatedClientAsync("背包_C11_批量发放混合奖励");
-            var service = new InventoryService(client);
+            var service = new BackpackService(client);
             var req = new BackpackMutationRequest
             {
                 source = "sdk_test_batch",
@@ -234,7 +235,7 @@ namespace NakamaServerMod.UnitySdk.Tests
         public async Task C12_Idempotent_GrantByRequestId_OnlyAppliesOnce()
         {
             var client = await CreateAuthenticatedClientAsync("背包_C12_发奖幂等只生效一次");
-            var service = new InventoryService(client);
+            var service = new BackpackService(client);
             var requestId = "req_" + Guid.NewGuid().ToString("N");
             var req = CreateGrantRequest("020300001", 2, 0, requestId);
 
@@ -253,7 +254,8 @@ namespace NakamaServerMod.UnitySdk.Tests
         public async Task C13_GetAllItemDefs_ReturnsConfiguredItems()
         {
             var client = await CreateAuthenticatedClientAsync("背包_C13_获取全部物品配置");
-            var response = await client.RpcAsync<InventoryItemDefsResponse>("inventory_get_item_defs");
+            var service = new BackpackService(client);
+            var response = await service.GetItemDefsAsync();
 
             Assert.IsTrue(response.success, response.error?.message);
             Assert.IsNotNull(response.items);
@@ -269,19 +271,51 @@ namespace NakamaServerMod.UnitySdk.Tests
         public async Task C14_GetAllBackpackItems_ReturnsGrantedItems()
         {
             var client = await CreateAuthenticatedClientAsync("背包_C14_获取背包全部物品");
-            var service = new InventoryService(client);
-            var grant = await service.GrantAsync(CreateGrantRequest("010300001", 2));
-            Assert.IsTrue(grant.success, grant.error?.message);
+            var service = new BackpackService(client);
+            var grantItem = await service.GrantAsync(CreateGrantRequest("010300001", 2));
+            Assert.IsTrue(grantItem.success, grantItem.error?.message);
+            var grantVip = await service.GrantAsync(CreateGrantRequest("item_vip_active", 1, NowTs() + 3600));
+            Assert.IsTrue(grantVip.success, grantVip.error?.message);
 
-            var response = await client.RpcAsync<InventoryAllInfoRequest, InventoryAllInfoResponse>(
-                "inventory_get_all_info",
-                new InventoryAllInfoRequest { page_size = 100, limit = 100 });
+            var response = await service.GetAllInfoAsync(new InventoryAllInfoRequest { page_size = 100, limit = 100 });
 
             Assert.IsTrue(response.success, response.error?.message);
             Assert.IsNotNull(response.backpackItems);
-            var item = response.backpackItems.FirstOrDefault(x => x.id == "010300001");
-            Assert.IsNotNull(item);
-            Assert.AreEqual(2, item.count);
+            Assert.IsTrue(response.backpackItems.Any(x => x.id == "010300001"));
+            Assert.IsTrue(response.backpackItems.Any(x => x.id == "item_vip_active"));
+
+            var hourglass = response.backpackItems.First(x => x.id == "010300001");
+            Assert.AreEqual(2, hourglass.count);
+            Assert.IsFalse(string.IsNullOrEmpty(hourglass.itemName));
+            Assert.IsFalse(string.IsNullOrEmpty(hourglass.itemDesc));
+            Assert.IsFalse(hourglass.hasExpireAt);
+            Assert.AreEqual(0, hourglass.expireAt);
+
+            var vip = response.backpackItems.First(x => x.id == "item_vip_active");
+            Assert.IsTrue(vip.hasExpireAt);
+            Assert.Greater(vip.expireAt, 0);
+        }
+
+        [Test]
+        public async Task C15_GetAllBackpackItems_FilterByItemType()
+        {
+            var client = await CreateAuthenticatedClientAsync("背包_C15_按类型筛选全部物品");
+            var service = new BackpackService(client);
+            await service.GrantAsync(CreateGrantRequest("010300001", 1));
+            await service.GrantAsync(CreateGrantRequest("item_vip_active", 1, NowTs() + 3600));
+
+            var response = await service.GetAllInfoAsync(new InventoryAllInfoRequest { page_size = 100, limit = 100, item_type = "item" });
+
+            Assert.IsTrue(response.success, response.error?.message);
+            Assert.IsNotNull(response.backpackItems);
+            Assert.IsTrue(response.backpackItems.Count > 0);
+            Assert.IsTrue(response.backpackItems.All(x => x.itemType == "item"));
+            Assert.IsTrue(response.backpackItems.Any(x => x.id == "010300001"));
+            Assert.IsFalse(response.backpackItems.Any(x => x.id == "item_vip_active"));
+            Assert.IsTrue(response.backpackItems.All(x => !string.IsNullOrEmpty(x.itemName)));
+            Assert.IsTrue(response.backpackItems.All(x => !string.IsNullOrEmpty(x.itemDesc)));
+            Assert.IsTrue(response.backpackItems.All(x => x.hasExpireAt == false));
+            Assert.IsTrue(response.backpackItems.All(x => x.expireAt == 0));
         }
 
         // 用例说明：满包时给已有堆叠物品加数量（当前环境跳过）。
@@ -310,7 +344,7 @@ namespace NakamaServerMod.UnitySdk.Tests
         public async Task B04_ConcurrentConsume_LastOneOnlyOnce()
         {
             var client = await CreateAuthenticatedClientAsync("背包_B04_并发扣减最后一个");
-            var service = new InventoryService(client);
+            var service = new BackpackService(client);
             await service.GrantAsync(CreateGrantRequest("010300001", 1));
 
             var req = new BackpackMutationRequest
@@ -348,7 +382,7 @@ namespace NakamaServerMod.UnitySdk.Tests
         public async Task B07_AtomicFailure_LogicCheck()
         {
             var client = await CreateAuthenticatedClientAsync("背包_B07_混合变更原子失败");
-            var service = new InventoryService(client);
+            var service = new BackpackService(client);
 
             // 步骤1：混合发放中包含非法物品，整体应失败且金币不应入账。
             var grantReq = new BackpackMutationRequest
@@ -393,7 +427,7 @@ namespace NakamaServerMod.UnitySdk.Tests
         public async Task B08_ExpireAtEqualsNow_IsInvalid()
         {
             var client = await CreateAuthenticatedClientAsync("背包_B08_到期瞬间判无效");
-            var service = new InventoryService(client);
+            var service = new BackpackService(client);
             await service.GrantAsync(CreateGrantRequest("item_vip_active", 1, NowTs()));
 
             var items = await service.GetItemsAsync(new[] { "item_vip_active" });
@@ -405,7 +439,7 @@ namespace NakamaServerMod.UnitySdk.Tests
         public async Task B09_RenewDuplicateRequest_OnlyOnce()
         {
             var client = await CreateAuthenticatedClientAsync("背包_B09_续费重复请求幂等");
-            var service = new InventoryService(client);
+            var service = new BackpackService(client);
             var requestId = "renew_" + Guid.NewGuid().ToString("N");
             var req = CreateGrantRequest("item_vip_active", 1, NowTs() + 86400, requestId);
 
@@ -424,7 +458,7 @@ namespace NakamaServerMod.UnitySdk.Tests
         public async Task B10_ZeroCountRecord_NotInEffectiveList()
         {
             var client = await CreateAuthenticatedClientAsync("背包_B10_零数量不在有效列表");
-            var service = new InventoryService(client);
+            var service = new BackpackService(client);
             await service.GrantAsync(CreateGrantRequest("020100001", 1));
             await service.ConsumeAsync(new BackpackMutationRequest
             {
@@ -441,7 +475,7 @@ namespace NakamaServerMod.UnitySdk.Tests
         public async Task B11_Reject_NonItemReference()
         {
             var client = await CreateAuthenticatedClientAsync("背包_B11_拒绝非物品引用");
-            var service = new InventoryService(client);
+            var service = new BackpackService(client);
 
             var grant = await service.GrantAsync(CreateGrantRequest("rewardRef_random_ship_pool", 1));
             Assert.IsFalse(grant.success);
@@ -453,7 +487,7 @@ namespace NakamaServerMod.UnitySdk.Tests
         public async Task B12_Reject_WrongAliasName()
         {
             var client = await CreateAuthenticatedClientAsync("背包_B12_拒绝错误别名");
-            var service = new InventoryService(client);
+            var service = new BackpackService(client);
 
             var grant = await service.GrantAsync(CreateGrantRequest("时钟沙漏", 1));
             Assert.IsFalse(grant.success);
@@ -465,7 +499,7 @@ namespace NakamaServerMod.UnitySdk.Tests
         public async Task B13_ReadAfterMutation_StateVersionAdvances()
         {
             var client = await CreateAuthenticatedClientAsync("背包_B13_读写后版本前进");
-            var service = new InventoryService(client);
+            var service = new BackpackService(client);
             var before = await service.GetItemsAsync(new[] { "010300001" });
             var beforeCount = before.items.FirstOrDefault(x => x.id == "010300001")?.count ?? 0;
 
@@ -481,7 +515,7 @@ namespace NakamaServerMod.UnitySdk.Tests
         public async Task B14_ExpiredTimedItem_NotReturnedAsValid()
         {
             var client = await CreateAuthenticatedClientAsync("背包_B14_过期限时不返回有效");
-            var service = new InventoryService(client);
+            var service = new BackpackService(client);
             await service.GrantAsync(CreateGrantRequest("item_svip_active", 1, NowTs() - 30));
 
             var list = await service.ListAsync();
