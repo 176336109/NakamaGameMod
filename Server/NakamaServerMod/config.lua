@@ -120,8 +120,6 @@ local fallback_items = {
     ["gold"] = { type = "currency", name = "金币", itemDesc = "金币说明" },
     ["gem"] = { type = "currency", name = "水晶", itemDesc = "水晶说明" },
     ["energy"] = { type = "currency", name = "Energy", itemDesc = "Energy说明" },
-    ["item_diamond"] = { type = "currency", name = "Diamond", itemDesc = "Diamond说明" },
-    ["item_gold"] = { type = "currency", name = "Gold Coin", itemDesc = "Gold Coin说明" },
     ["item_vip_active"] = { type = "entitlement", name = "VIP Monthly Card", itemDesc = "VIP Monthly Card说明", max_stack = 1 },
     ["item_svip_active"] = { type = "entitlement", name = "SVIP Monthly Card", itemDesc = "SVIP Monthly Card说明", max_stack = 1 },
     ["hero_ssr_001"] = { type = "hero", name = "SSR Knight", itemDesc = "SSR Knight说明", rarity = "SSR" },
@@ -171,8 +169,8 @@ M.gacha = {
 M.benefit_plans = {
     ["vip_monthly"] = {
         id = "vip_monthly",
-        immediateItems = { { id = "item_diamond", count = 180 } },
-        dailyItems = { { id = "item_diamond", count = 30 } },
+        immediateItems = { { id = "gem", count = 180 } },
+        dailyItems = { { id = "gem", count = 30 } },
         privileges = {
             reviveLimit = 4,
             reviveNeedsAd = true,
@@ -186,9 +184,9 @@ M.benefit_plans = {
     },
     ["svip_monthly"] = {
         id = "svip_monthly",
-        immediateItems = { { id = "item_diamond", count = 300 } },
+        immediateItems = { { id = "gem", count = 300 } },
         dailyItems = {
-            { id = "item_diamond", count = 60 },
+            { id = "gem", count = 60 },
             { id = "010300001",    count = 3 }
         },
         privileges = {
@@ -221,7 +219,7 @@ M.checkin = {
 
 -- 商店配置
 M.shop = {
-    refresh_cost = { item_id = "item_diamond", count = 5 },
+    refresh_cost = { item_id = "gem", count = 5 },
     goods = {
         -- 特惠商店（Special Shop）
         ["SHOP_SKILL_GREEN_5"] = {
@@ -248,7 +246,7 @@ M.shop = {
             shopType = "special",
             displayMode = "random",
             weight = 10,
-            costType = "item_diamond",
+            costType = "gem",
             costValue = 15,
             limitType = "per_refresh",
             limitValue = 1,
@@ -278,7 +276,7 @@ M.shop = {
             shopType = "special",
             displayMode = "random",
             weight = 20,
-            costType = "item_diamond",
+            costType = "gem",
             costValue = 5,
             limitType = "per_refresh",
             limitValue = 1,
@@ -289,7 +287,7 @@ M.shop = {
         ["SHOP_SKILL_GOLD_WEEK"] = {
             shopType = "special",
             displayMode = "fixed",
-            costType = "item_diamond",
+            costType = "gem",
             costValue = 30,
             limitType = "weekly",
             limitValue = 1,
@@ -298,7 +296,7 @@ M.shop = {
         ["SHOP_GROWTH_GIFT_PERM"] = {
             shopType = "special",
             displayMode = "fixed",
-            costType = "item_diamond",
+            costType = "gem",
             costValue = 30,
             limitType = "permanent",
             limitValue = 1,
@@ -306,20 +304,20 @@ M.shop = {
         },
 
         -- 水晶商店（Crystal Shop）- IAP
-        ["CRYSTAL_001"] = { shopType = "crystal", displayMode = "iap", costType = "rmb", costValue = 600, rewardItems = { { id = "item_diamond", count = 60 } } },
-        ["CRYSTAL_002"] = { shopType = "crystal", displayMode = "iap", costType = "rmb", costValue = 1800, rewardItems = { { id = "item_diamond", count = 180 } } },
-        ["CRYSTAL_003"] = { shopType = "crystal", displayMode = "iap", costType = "rmb", costValue = 3000, rewardItems = { { id = "item_diamond", count = 300 } } },
-        ["CRYSTAL_004"] = { shopType = "crystal", displayMode = "iap", costType = "rmb", costValue = 6800, rewardItems = { { id = "item_diamond", count = 700 } } }, -- 含赠送
-        ["CRYSTAL_005"] = { shopType = "crystal", displayMode = "iap", costType = "rmb", costValue = 9800, rewardItems = { { id = "item_diamond", count = 1030 } } },
-        ["CRYSTAL_006"] = { shopType = "crystal", displayMode = "iap", costType = "rmb", costValue = 19800, rewardItems = { { id = "item_diamond", count = 2130 } } },
-        ["CRYSTAL_007"] = { shopType = "crystal", displayMode = "iap", costType = "rmb", costValue = 32800, rewardItems = { { id = "item_diamond", count = 3630 } } },
-        ["CRYSTAL_008"] = { shopType = "crystal", displayMode = "iap", costType = "rmb", costValue = 64800, rewardItems = { { id = "item_diamond", count = 7480 } } },
+        ["CRYSTAL_001"] = { shopType = "crystal", displayMode = "iap", costType = "rmb", costValue = 600, rewardItems = { { id = "gem", count = 60 } } },
+        ["CRYSTAL_002"] = { shopType = "crystal", displayMode = "iap", costType = "rmb", costValue = 1800, rewardItems = { { id = "gem", count = 180 } } },
+        ["CRYSTAL_003"] = { shopType = "crystal", displayMode = "iap", costType = "rmb", costValue = 3000, rewardItems = { { id = "gem", count = 300 } } },
+        ["CRYSTAL_004"] = { shopType = "crystal", displayMode = "iap", costType = "rmb", costValue = 6800, rewardItems = { { id = "gem", count = 700 } } }, -- 含赠送
+        ["CRYSTAL_005"] = { shopType = "crystal", displayMode = "iap", costType = "rmb", costValue = 9800, rewardItems = { { id = "gem", count = 1030 } } },
+        ["CRYSTAL_006"] = { shopType = "crystal", displayMode = "iap", costType = "rmb", costValue = 19800, rewardItems = { { id = "gem", count = 2130 } } },
+        ["CRYSTAL_007"] = { shopType = "crystal", displayMode = "iap", costType = "rmb", costValue = 32800, rewardItems = { { id = "gem", count = 3630 } } },
+        ["CRYSTAL_008"] = { shopType = "crystal", displayMode = "iap", costType = "rmb", costValue = 64800, rewardItems = { { id = "gem", count = 7480 } } },
 
         -- 金币商店（Gold Shop）
         ["GOLD_001"] = {
             shopType = "gold",
             displayMode = "exchange",
-            costType = "item_diamond",
+            costType = "gem",
             costValue = 1,
             limitType = "none",
             limitValue = 0,
@@ -328,7 +326,7 @@ M.shop = {
         ["GOLD_002"] = {
             shopType = "gold",
             displayMode = "exchange",
-            costType = "item_diamond",
+            costType = "gem",
             costValue = 10,
             limitType = "daily",
             limitValue = 1,
@@ -337,7 +335,7 @@ M.shop = {
         ["GOLD_003"] = {
             shopType = "gold",
             displayMode = "exchange",
-            costType = "item_diamond",
+            costType = "gem",
             costValue = 50,
             limitType = "daily",
             limitValue = 1,
@@ -346,7 +344,7 @@ M.shop = {
         ["GOLD_004"] = {
             shopType = "gold",
             displayMode = "exchange",
-            costType = "item_diamond",
+            costType = "gem",
             costValue = 100,
             limitType = "daily",
             limitValue = 1,
@@ -355,7 +353,7 @@ M.shop = {
         ["GOLD_005"] = {
             shopType = "gold",
             displayMode = "exchange",
-            costType = "item_diamond",
+            costType = "gem",
             costValue = 500,
             limitType = "daily",
             limitValue = 1,

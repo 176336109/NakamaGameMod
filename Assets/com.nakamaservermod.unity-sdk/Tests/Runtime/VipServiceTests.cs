@@ -56,8 +56,8 @@ namespace NakamaServerMod.UnitySdk.Tests
             // 验证钱包中有钻石
             var walletResponse = await inventoryService.GetWalletAsync();
             var wallet = walletResponse.wallet ?? new System.Collections.Generic.Dictionary<string, long>();
-            Assert.IsTrue(wallet.ContainsKey("item_diamond"));
-            Assert.GreaterOrEqual(wallet["item_diamond"], 210); // 至少获得210
+            Assert.IsTrue(wallet.ContainsKey("gem"));
+            Assert.GreaterOrEqual(wallet["gem"], 210); // 至少获得210
 
             // 最终结果验证：
             // - VIP 状态激活 (vip_active == true)
@@ -101,8 +101,8 @@ namespace NakamaServerMod.UnitySdk.Tests
             // 验证钱包中有钻石
             var walletResponse = await inventoryService.GetWalletAsync();
             var wallet = walletResponse.wallet ?? new System.Collections.Generic.Dictionary<string, long>();
-            Assert.IsTrue(wallet.ContainsKey("item_diamond"));
-            Assert.GreaterOrEqual(wallet["item_diamond"], 360); // 至少获得360
+            Assert.IsTrue(wallet.ContainsKey("gem"));
+            Assert.GreaterOrEqual(wallet["gem"], 360); // 至少获得360
             
             // 验证背包中有沙漏 (3)
             var items = await inventoryService.GetItemsAsync();
@@ -163,8 +163,8 @@ namespace NakamaServerMod.UnitySdk.Tests
             // 验证钱包中有钻石
             var walletResponse = await inventoryService.GetWalletAsync();
             var wallet = walletResponse.wallet ?? new System.Collections.Generic.Dictionary<string, long>();
-            Assert.IsTrue(wallet.ContainsKey("item_diamond"));
-            Assert.GreaterOrEqual(wallet["item_diamond"], 570); // 至少获得570
+            Assert.IsTrue(wallet.ContainsKey("gem"));
+            Assert.GreaterOrEqual(wallet["gem"], 570); // 至少获得570
             
             // 验证背包中有沙漏 (3)
             var items = await inventoryService.GetItemsAsync();

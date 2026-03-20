@@ -20,9 +20,9 @@ namespace NakamaServerMod.UnitySdk.Tests
             return client;
         }
 
-        private async Task SeedFundsAsync(GameClient client, int gold = 20000, int diamond = 3000)
+        private async Task SeedFundsAsync(GameClient client, int gold = 20000, int gem = 3000)
         {
-            var payload = $"[{{\"id\":\"gold\",\"count\":{gold}}},{{\"id\":\"item_diamond\",\"count\":{diamond}}}]";
+            var payload = $"[{{\"id\":\"gold\",\"count\":{gold}}},{{\"id\":\"gem\",\"count\":{gem}}}]";
             await client.RpcAsync<string, string>("debug_add_items", payload);
         }
 
@@ -82,7 +82,7 @@ namespace NakamaServerMod.UnitySdk.Tests
             var before = await shopService.GetStateAsync();
             var oldSnapshotId = before.specialSnapshot.snapshotId;
             var walletBefore = await GetWalletAsync(client);
-            var diamondBefore = walletBefore.ContainsKey("item_diamond") ? walletBefore["item_diamond"] : 0;
+            var diamondBefore = walletBefore.ContainsKey("gem") ? walletBefore["gem"] : 0;
 
             var response = await shopService.RefreshAsync();
 
@@ -91,7 +91,7 @@ namespace NakamaServerMod.UnitySdk.Tests
             Assert.AreEqual(6, response.snapshot.slotEntries.Count);
 
             var walletAfter = await GetWalletAsync(client);
-            var diamondAfter = walletAfter.ContainsKey("item_diamond") ? walletAfter["item_diamond"] : 0;
+            var diamondAfter = walletAfter.ContainsKey("gem") ? walletAfter["gem"] : 0;
             Assert.AreEqual(diamondBefore - 5, diamondAfter);
         }
 
@@ -219,13 +219,13 @@ namespace NakamaServerMod.UnitySdk.Tests
             await SeedFundsAsync(client);
 
             var walletBefore = await GetWalletAsync(client);
-            var before = walletBefore.ContainsKey("item_diamond") ? walletBefore["item_diamond"] : 0;
+            var before = walletBefore.ContainsKey("gem") ? walletBefore["gem"] : 0;
 
             var buy = await shopService.BuyAsync("CRYSTAL_004");
             Assert.IsTrue(buy.success, buy.error);
 
             var walletAfter = await GetWalletAsync(client);
-            var after = walletAfter.ContainsKey("item_diamond") ? walletAfter["item_diamond"] : 0;
+            var after = walletAfter.ContainsKey("gem") ? walletAfter["gem"] : 0;
             Assert.AreEqual(before + 700, after);
         }
 
@@ -237,13 +237,13 @@ namespace NakamaServerMod.UnitySdk.Tests
             await SeedFundsAsync(client);
 
             var walletBefore = await GetWalletAsync(client);
-            var before = walletBefore.ContainsKey("item_diamond") ? walletBefore["item_diamond"] : 0;
+            var before = walletBefore.ContainsKey("gem") ? walletBefore["gem"] : 0;
 
             var buy = await shopService.BuyAsync("CRYSTAL_004");
             Assert.IsTrue(buy.success, buy.error);
 
             var walletAfter = await GetWalletAsync(client);
-            var after = walletAfter.ContainsKey("item_diamond") ? walletAfter["item_diamond"] : 0;
+            var after = walletAfter.ContainsKey("gem") ? walletAfter["gem"] : 0;
             Assert.AreEqual(before + 700, after);
         }
 
@@ -434,7 +434,7 @@ namespace NakamaServerMod.UnitySdk.Tests
 
             var walletBefore = await GetWalletAsync(client);
             var goldBefore = walletBefore.ContainsKey("gold") ? walletBefore["gold"] : 0;
-            var diamondBefore = walletBefore.ContainsKey("item_diamond") ? walletBefore["item_diamond"] : 0;
+            var diamondBefore = walletBefore.ContainsKey("gem") ? walletBefore["gem"] : 0;
 
             var invBefore = await inventoryService.GetItemsAsync();
             var hourglassBefore = invBefore.items?.FirstOrDefault(x => x.id == "010300001")?.count ?? 0;
@@ -448,7 +448,7 @@ namespace NakamaServerMod.UnitySdk.Tests
 
             var walletAfter = await GetWalletAsync(client);
             var goldAfter = walletAfter.ContainsKey("gold") ? walletAfter["gold"] : 0;
-            var diamondAfter = walletAfter.ContainsKey("item_diamond") ? walletAfter["item_diamond"] : 0;
+            var diamondAfter = walletAfter.ContainsKey("gem") ? walletAfter["gem"] : 0;
 
             var invAfter = await inventoryService.GetItemsAsync();
             var hourglassAfter = invAfter.items?.FirstOrDefault(x => x.id == "010300001")?.count ?? 0;

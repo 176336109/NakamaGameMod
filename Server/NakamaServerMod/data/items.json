@@ -5,8 +5,6 @@
         "gold": { "type": "currency", "name": "金币", "itemDesc": "金币说明" },
         "gem": { "type": "currency", "name": "水晶", "itemDesc": "水晶说明" },
         "energy": { "type": "currency", "name": "Energy", "itemDesc": "Energy说明" },
-        "item_diamond": { "type": "currency", "name": "Diamond", "itemDesc": "Diamond说明" },
-        "item_gold": { "type": "currency", "name": "Gold Coin", "itemDesc": "Gold Coin说明" },
         "item_vip_active": { "type": "entitlement", "name": "VIP Monthly Card", "itemDesc": "VIP Monthly Card说明", "max_stack": 1 },
         "item_svip_active": { "type": "entitlement", "name": "SVIP Monthly Card", "itemDesc": "SVIP Monthly Card说明", "max_stack": 1 },
         "hero_ssr_001": { "type": "hero", "name": "SSR Knight", "itemDesc": "SSR Knight说明", "rarity": "SSR" },
