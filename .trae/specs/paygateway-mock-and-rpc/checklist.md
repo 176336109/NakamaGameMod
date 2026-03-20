@@ -1,0 +1,6 @@
+- [x] PayGateway `mock` provider is registered and functional.
+- [x] Nakama `rpc_create_order` successfully creates an order in PayGateway.
+- [x] Nakama `rpc_mock_pay` successfully triggers a notification in PayGateway.
+- [x] The full Mock flow (Create -> Mock Pay -> Delivery) works end-to-end (verified via logs or DB).
+- [x] Unity SDK has `CreateOrderAsync` and `MockPayAsync` methods.
+- [x] Readme is updated with the new flow.

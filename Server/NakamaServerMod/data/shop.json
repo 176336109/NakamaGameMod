@@ -1,0 +1,94 @@
+{
+    "refresh_cost": { "item_id": "gem", "count": 5 },
+    "goods": {
+        "SHOP_SKILL_GREEN_5": {
+            "shopType": "special", "displayMode": "random", "weight": 100,
+            "costType": "gold", "costValue": 200,
+            "limitType": "per_refresh", "limitValue": 1,
+            "rewardItems": [ { "id": "020100001", "count": 5 } ]
+        },
+        "SHOP_SKILL_BLUE_3": {
+            "shopType": "special", "displayMode": "random", "weight": 50,
+            "costType": "gold", "costValue": 400,
+            "limitType": "per_refresh", "limitValue": 1,
+            "rewardItems": [ { "id": "020200001", "count": 3 } ]
+        },
+        "SHOP_SKILL_PURPLE_1": {
+            "shopType": "special", "displayMode": "random", "weight": 10,
+            "costType": "gem", "costValue": 15,
+            "limitType": "per_refresh", "limitValue": 1,
+            "rewardItems": [ { "id": "020300001", "count": 1 } ]
+        },
+        "SHOP_MOD_GREEN_5": {
+            "shopType": "special", "displayMode": "random", "weight": 100,
+            "costType": "gold", "costValue": 200,
+            "limitType": "per_refresh", "limitValue": 1,
+            "rewardItems": [ { "id": "030100001", "count": 5 } ]
+        },
+        "SHOP_MOD_BLUE_3": {
+            "shopType": "special", "displayMode": "random", "weight": 50,
+            "costType": "gold", "costValue": 400,
+            "limitType": "per_refresh", "limitValue": 1,
+            "rewardItems": [ { "id": "030200001", "count": 3 } ]
+        },
+        "SHOP_TIMESAND_1": {
+            "shopType": "special", "displayMode": "random", "weight": 20,
+            "costType": "gem", "costValue": 5,
+            "limitType": "per_refresh", "limitValue": 1,
+            "rewardItems": [ { "id": "010300001", "count": 1 } ]
+        },
+        
+        "SHOP_SKILL_GOLD_WEEK": {
+            "shopType": "special", "displayMode": "fixed",
+            "costType": "gem", "costValue": 30,
+            "limitType": "weekly", "limitValue": 1,
+            "rewardItems": [ { "id": "020300001", "count": 1 } ]
+        },
+        "SHOP_GROWTH_GIFT_PERM": {
+            "shopType": "special", "displayMode": "fixed",
+            "costType": "gem", "costValue": 30,
+            "limitType": "permanent", "limitValue": 1,
+            "rewardItems": [ { "id": "gold", "count": 500 }, { "id": "010300001", "count": 2 } ]
+        },
+
+        "CRYSTAL_001": { "shopType": "crystal", "displayMode": "iap", "costType": "rmb", "costValue": 600, "rewardItems": [ { "id": "gem", "count": 60 } ] },
+        "CRYSTAL_002": { "shopType": "crystal", "displayMode": "iap", "costType": "rmb", "costValue": 1800, "rewardItems": [ { "id": "gem", "count": 180 } ] },
+        "CRYSTAL_003": { "shopType": "crystal", "displayMode": "iap", "costType": "rmb", "costValue": 3000, "rewardItems": [ { "id": "gem", "count": 300 } ] },
+        "CRYSTAL_004": { "shopType": "crystal", "displayMode": "iap", "costType": "rmb", "costValue": 6800, "rewardItems": [ { "id": "gem", "count": 700 } ] },
+        "CRYSTAL_005": { "shopType": "crystal", "displayMode": "iap", "costType": "rmb", "costValue": 9800, "rewardItems": [ { "id": "gem", "count": 1030 } ] },
+        "CRYSTAL_006": { "shopType": "crystal", "displayMode": "iap", "costType": "rmb", "costValue": 19800, "rewardItems": [ { "id": "gem", "count": 2130 } ] },
+        "CRYSTAL_007": { "shopType": "crystal", "displayMode": "iap", "costType": "rmb", "costValue": 32800, "rewardItems": [ { "id": "gem", "count": 3630 } ] },
+        "CRYSTAL_008": { "shopType": "crystal", "displayMode": "iap", "costType": "rmb", "costValue": 64800, "rewardItems": [ { "id": "gem", "count": 7480 } ] },
+
+        "GOLD_001": {
+            "shopType": "gold", "displayMode": "exchange",
+            "costType": "gem", "costValue": 1,
+            "limitType": "none", "limitValue": 0,
+            "rewardItems": [ { "id": "gold", "count": 25 } ]
+        },
+        "GOLD_002": {
+            "shopType": "gold", "displayMode": "exchange",
+            "costType": "gem", "costValue": 10,
+            "limitType": "daily", "limitValue": 1,
+            "rewardItems": [ { "id": "gold", "count": 250 } ]
+        },
+        "GOLD_003": {
+            "shopType": "gold", "displayMode": "exchange",
+            "costType": "gem", "costValue": 50,
+            "limitType": "daily", "limitValue": 1,
+            "rewardItems": [ { "id": "gold", "count": 1300 } ]
+        },
+        "GOLD_004": {
+            "shopType": "gold", "displayMode": "exchange",
+            "costType": "gem", "costValue": 100,
+            "limitType": "daily", "limitValue": 1,
+            "rewardItems": [ { "id": "gold", "count": 2800 } ]
+        },
+        "GOLD_005": {
+            "shopType": "gold", "displayMode": "exchange",
+            "costType": "gem", "costValue": 500,
+            "limitType": "daily", "limitValue": 1,
+            "rewardItems": [ { "id": "gold", "count": 15000 } ]
+        }
+    }
+}

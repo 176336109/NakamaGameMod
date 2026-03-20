@@ -1,0 +1,5 @@
+- [x] `service/iap_service.lua` is created and correctly wires dependencies.
+- [x] `rpc_pay_callback` parses the payload from PayGateway.
+- [x] Idempotency is enforced: checking storage before granting rewards and writing to storage after.
+- [x] `iap_service` successfully calls the domain logic to grant items defined in `config.iap_products`.
+- [x] `pay_callback` RPC is registered in `main.lua`.

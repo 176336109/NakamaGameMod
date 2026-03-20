@@ -29,7 +29,7 @@ namespace NakamaServerMod.UnitySdk.Tests
         {
             var client = await CreateAuthenticatedClientAsync("购买VIP测试");
             var vipService = new VipService(client);
-            var inventoryService = new InventoryService(client);
+            var inventoryService = new BackpackService(client);
 
             // 购买 VIP
             var purchaseResult = await vipService.PurchaseVipAsync();
@@ -54,10 +54,10 @@ namespace NakamaServerMod.UnitySdk.Tests
             Assert.AreEqual(0, status.vip_unclaimed_days);
             
             // 验证钱包中有钻石
-            var account = await client.GetAccountAsync();
-            var wallet = Unity.Plastic.Newtonsoft.Json.JsonConvert.DeserializeObject<System.Collections.Generic.Dictionary<string, long>>(account.Wallet);
-            Assert.IsTrue(wallet.ContainsKey("item_diamond"));
-            Assert.GreaterOrEqual(wallet["item_diamond"], 210); // 至少获得210
+            var walletResponse = await inventoryService.GetWalletAsync();
+            var wallet = walletResponse.wallet ?? new System.Collections.Generic.Dictionary<string, long>();
+            Assert.IsTrue(wallet.ContainsKey("gem"));
+            Assert.GreaterOrEqual(wallet["gem"], 210); // 至少获得210
 
             // 最终结果验证：
             // - VIP 状态激活 (vip_active == true)
@@ -74,7 +74,7 @@ namespace NakamaServerMod.UnitySdk.Tests
         {
             var client = await CreateAuthenticatedClientAsync("购买SVIP测试");
             var vipService = new VipService(client);
-            var inventoryService = new InventoryService(client);
+            var inventoryService = new BackpackService(client);
 
             // 购买 SVIP
             var purchaseResult = await vipService.PurchaseSvipAsync();
@@ -99,10 +99,10 @@ namespace NakamaServerMod.UnitySdk.Tests
             Assert.AreEqual(0, status.svip_unclaimed_days);
             
             // 验证钱包中有钻石
-            var account = await client.GetAccountAsync();
-            var wallet = Unity.Plastic.Newtonsoft.Json.JsonConvert.DeserializeObject<System.Collections.Generic.Dictionary<string, long>>(account.Wallet);
-            Assert.IsTrue(wallet.ContainsKey("item_diamond"));
-            Assert.GreaterOrEqual(wallet["item_diamond"], 360); // 至少获得360
+            var walletResponse = await inventoryService.GetWalletAsync();
+            var wallet = walletResponse.wallet ?? new System.Collections.Generic.Dictionary<string, long>();
+            Assert.IsTrue(wallet.ContainsKey("gem"));
+            Assert.GreaterOrEqual(wallet["gem"], 360); // 至少获得360
             
             // 验证背包中有沙漏 (3)
             var items = await inventoryService.GetItemsAsync();
@@ -133,7 +133,7 @@ namespace NakamaServerMod.UnitySdk.Tests
         {
             var client = await CreateAuthenticatedClientAsync("一键领取测试");
             var vipService = new VipService(client);
-            var inventoryService = new InventoryService(client);
+            var inventoryService = new BackpackService(client);
 
             // 购买 VIP 和 SVIP
             await vipService.PurchaseVipAsync();
@@ -161,10 +161,10 @@ namespace NakamaServerMod.UnitySdk.Tests
             Assert.AreEqual(0, status.svip_unclaimed_days);
             
             // 验证钱包中有钻石
-            var account = await client.GetAccountAsync();
-            var wallet = Unity.Plastic.Newtonsoft.Json.JsonConvert.DeserializeObject<System.Collections.Generic.Dictionary<string, long>>(account.Wallet);
-            Assert.IsTrue(wallet.ContainsKey("item_diamond"));
-            Assert.GreaterOrEqual(wallet["item_diamond"], 570); // 至少获得570
+            var walletResponse = await inventoryService.GetWalletAsync();
+            var wallet = walletResponse.wallet ?? new System.Collections.Generic.Dictionary<string, long>();
+            Assert.IsTrue(wallet.ContainsKey("gem"));
+            Assert.GreaterOrEqual(wallet["gem"], 570); // 至少获得570
             
             // 验证背包中有沙漏 (3)
             var items = await inventoryService.GetItemsAsync();
@@ -309,6 +309,94 @@ namespace NakamaServerMod.UnitySdk.Tests
 
             // 最终结果验证：
             // - 不可使用额外队列 (can_use_extra_queue == false)
+        }
+
+        [Test]
+        public async Task TestRecordReviveUsage()
+        {
+            var client = await CreateAuthenticatedClientAsync("记录复活次数测试");
+            var vipService = new VipService(client);
+
+            var before = await vipService.CheckRevivePermissionAsync();
+            Assert.IsNotNull(before);
+            Assert.AreEqual(3, before.remaining);
+
+            var recordResult = await vipService.RecordReviveUsageAsync(true);
+            Assert.IsTrue(recordResult.success);
+
+            var after = await vipService.CheckRevivePermissionAsync();
+            Assert.IsNotNull(after);
+            Assert.AreEqual(2, after.remaining);
+        }
+
+        [Test]
+        public async Task TestRecordSweepUsage()
+        {
+            var client = await CreateAuthenticatedClientAsync("记录扫荡次数测试");
+            var vipService = new VipService(client);
+
+            var before = await vipService.CheckSweepPermissionAsync();
+            Assert.IsNotNull(before);
+            Assert.AreEqual(3, before.remaining);
+
+            var recordResult = await vipService.RecordSweepUsageAsync();
+            Assert.IsTrue(recordResult.success);
+
+            var after = await vipService.CheckSweepPermissionAsync();
+            Assert.IsNotNull(after);
+            Assert.AreEqual(2, after.remaining);
+        }
+
+        [Test]
+        public async Task TestRecordPlunderUsage()
+        {
+            var client = await CreateAuthenticatedClientAsync("记录掠夺次数测试");
+            var vipService = new VipService(client);
+
+            var before = await vipService.CheckPlunderPermissionAsync();
+            Assert.IsNotNull(before);
+            Assert.AreEqual(1, before.base_remaining);
+            Assert.AreEqual(1, before.ad_remaining);
+
+            var baseRecordResult = await vipService.RecordPlunderUsageAsync(false);
+            Assert.IsTrue(baseRecordResult.success);
+
+            var afterBase = await vipService.CheckPlunderPermissionAsync();
+            Assert.IsNotNull(afterBase);
+            Assert.AreEqual(0, afterBase.base_remaining);
+            Assert.AreEqual(1, afterBase.ad_remaining);
+
+            var adRecordResult = await vipService.RecordPlunderUsageAsync(true);
+            Assert.IsTrue(adRecordResult.success);
+
+            var afterAd = await vipService.CheckPlunderPermissionAsync();
+            Assert.IsNotNull(afterAd);
+            Assert.AreEqual(0, afterAd.base_remaining);
+            Assert.AreEqual(0, afterAd.ad_remaining);
+        }
+
+        [Test]
+        public async Task TestDebugSimulatePurchase()
+        {
+            var client = await CreateAuthenticatedClientAsync("模拟IAP购买测试");
+            var vipService = new VipService(client);
+
+            var vipResult = await vipService.DebugSimulatePurchaseAsync("vip_monthly");
+            Assert.IsNotNull(vipResult);
+            Assert.IsTrue(vipResult.success);
+            Assert.IsNotNull(vipResult.item_data);
+            Assert.AreEqual("item_vip_active", vipResult.item_data.itemId);
+
+            var svipResult = await vipService.DebugSimulatePurchaseAsync("svip_monthly");
+            Assert.IsNotNull(svipResult);
+            Assert.IsTrue(svipResult.success);
+            Assert.IsNotNull(svipResult.item_data);
+            Assert.AreEqual("item_svip_active", svipResult.item_data.itemId);
+
+            var status = await vipService.GetVipStatusAsync();
+            Assert.IsNotNull(status);
+            Assert.IsTrue(status.vip_active);
+            Assert.IsTrue(status.svip_active);
         }
     }
 }

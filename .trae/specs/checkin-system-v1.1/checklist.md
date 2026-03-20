@@ -7,5 +7,5 @@
 - [x] `main.lua` registers all 4 checkin RPCs.
 - [x] `CheckinServiceTests.cs` uses Chinese usernames (`C01_新账号...`).
 - [x] `CheckinServiceTests.cs` includes C01-C12 and B01-B16 test cases.
-- [x] Each test case has Chinese comments for steps and a final result verification block.
-- [x] All tests pass without "RPC cancelled" error.
+- [ ] Each test case has Chinese comments for steps and a final result verification block.
+- [ ] All tests pass without "RPC cancelled" error.

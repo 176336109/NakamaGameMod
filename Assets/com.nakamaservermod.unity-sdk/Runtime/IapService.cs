@@ -24,6 +24,19 @@ namespace NakamaServerMod.UnitySdk
             }
         }
 
+        [Serializable]
+        private sealed class CreateOrderPayload
+        {
+            public string product_id;
+            public string provider;
+        }
+
+        [Serializable]
+        private sealed class MockPayPayload
+        {
+            public string order_id;
+        }
+
         private readonly GameClient _client;
 
         public IapService(GameClient client)
@@ -130,6 +143,62 @@ namespace NakamaServerMod.UnitySdk
             catch (Exception ex)
             {
                 throw SdkException.Unexpected("ValidatePurchaseGoogleAsync failed.", ex);
+            }
+        }
+
+        public async Task<string> CreateOrderAsync(string productId, string provider = "mock")
+        {
+            if (string.IsNullOrEmpty(productId))
+            {
+                throw new ArgumentException("productId is required.", nameof(productId));
+            }
+
+            if (_client.Session == null)
+            {
+                throw SdkException.InvalidSession();
+            }
+
+            try
+            {
+                var payload = _client.Json.ToJson(new CreateOrderPayload { product_id = productId, provider = provider });
+                var rpcResult = await _client.Client.RpcAsync(_client.Session, "create_order", payload);
+                return rpcResult.Payload;
+            }
+            catch (ApiResponseException ex)
+            {
+                throw SdkException.Api(ex.Message, ex, statusCode: (int)ex.StatusCode);
+            }
+            catch (Exception ex)
+            {
+                throw SdkException.Unexpected("CreateOrderAsync failed.", ex);
+            }
+        }
+
+        public async Task<string> MockPayAsync(string orderId)
+        {
+            if (string.IsNullOrEmpty(orderId))
+            {
+                throw new ArgumentException("orderId is required.", nameof(orderId));
+            }
+
+            if (_client.Session == null)
+            {
+                throw SdkException.InvalidSession();
+            }
+
+            try
+            {
+                var payload = _client.Json.ToJson(new MockPayPayload { order_id = orderId });
+                var rpcResult = await _client.Client.RpcAsync(_client.Session, "mock_pay", payload);
+                return rpcResult.Payload;
+            }
+            catch (ApiResponseException ex)
+            {
+                throw SdkException.Api(ex.Message, ex, statusCode: (int)ex.StatusCode);
+            }
+            catch (Exception ex)
+            {
+                throw SdkException.Unexpected("MockPayAsync failed.", ex);
             }
         }
     }

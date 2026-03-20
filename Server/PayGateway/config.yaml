@@ -1,0 +1,25 @@
+server:
+  addr: ":8080"
+
+db:
+  type: "postgres" # "postgres", "mysql", "memory"
+  dsn: "host=localhost user=postgres password=456852 dbname=paygateway port=5432 sslmode=disable TimeZone=Asia/Shanghai"
+
+business:
+  nakama_notify_url: "http://localhost:7350/v2/rpc/pay_callback"
+  nakama_server_key: "defaultkey" # Nakama Server Key for Server API auth
+  nakama_api_url: "http://localhost:7350"
+  sign_secret: "your_hmac_secret"
+
+providers:
+  - name: "wechat"
+    mchid: "1234567890"
+    notify_path: "/v1/providers/wechat/notify"
+    
+  - name: "myprovider"
+    base_url: "https://api.example.com"
+    notify_expect_body: "ok"
+    notify_path: "/v1/providers/myprovider/notify"
+
+  - name: "mock"
+    notify_path: "/v1/providers/mock/notify"

@@ -1,0 +1,20 @@
+local nk = require("nakama")
+
+local M = {}
+local gacha_domain = nil
+
+function M.wire_item_gateway(backpack, gacha)
+    gacha_domain = gacha
+    if gacha_domain and type(gacha_domain.set_item_gateway) == "function" then
+        gacha_domain.set_item_gateway(backpack)
+    end
+end
+
+function M.rpc_gacha_pull(context, payload)
+    if not gacha_domain or type(gacha_domain.rpc_gacha_pull) ~= "function" then
+        return nk.json_encode({ error = "Gacha service not wired" })
+    end
+    return gacha_domain.rpc_gacha_pull(context, payload)
+end
+
+return M

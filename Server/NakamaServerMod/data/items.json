@@ -1,0 +1,25 @@
+{
+    "items": {
+        "1": { "type": "currency", "name": "金币", "itemDesc": "金币说明" },
+        "2": { "type": "currency", "name": "水晶", "itemDesc": "水晶说明" },
+        "gold": { "type": "currency", "name": "金币", "itemDesc": "金币说明" },
+        "gem": { "type": "currency", "name": "水晶", "itemDesc": "水晶说明" },
+        "energy": { "type": "currency", "name": "Energy", "itemDesc": "Energy说明" },
+        "item_vip_active": { "type": "entitlement", "name": "VIP Monthly Card", "itemDesc": "VIP Monthly Card说明", "max_stack": 1 },
+        "item_svip_active": { "type": "entitlement", "name": "SVIP Monthly Card", "itemDesc": "SVIP Monthly Card说明", "max_stack": 1 },
+        "hero_ssr_001": { "type": "hero", "name": "SSR Knight", "itemDesc": "SSR Knight说明", "rarity": "SSR" },
+        "hero_sr_001": { "type": "hero", "name": "SR Archer", "itemDesc": "SR Archer说明", "rarity": "SR" },
+        "hero_r_001": { "type": "hero", "name": "R Soldier", "itemDesc": "R Soldier说明", "rarity": "R" },
+        "010300001": { "type": "special", "name": "时光沙漏", "itemDesc": "时光沙漏说明", "max_stack": 9999 },
+        "020100001": { "type": "skill_fragment", "name": "技能碎片1", "itemDesc": "技能碎片说明", "max_stack": 999 },
+        "020200001": { "type": "skill_fragment", "name": "技能碎片2", "itemDesc": "技能碎片说明", "max_stack": 999 },
+        "020300001": { "type": "skill_fragment", "name": "技能碎片3", "itemDesc": "技能碎片说明", "max_stack": 999 },
+        "020400001": { "type": "skill_fragment", "name": "技能碎片4", "itemDesc": "技能碎片说明", "max_stack": 999 },
+        "020500001": { "type": "skill_fragment", "name": "技能碎片5", "itemDesc": "技能碎片说明", "max_stack": 999 },
+        "030100001": { "type": "mod_fragment", "name": "改装件碎片6", "itemDesc": "改装件碎片说明", "max_stack": 999 },
+        "030200001": { "type": "mod_fragment", "name": "改装件碎片7", "itemDesc": "改装件碎片说明", "max_stack": 999 },
+        "030300001": { "type": "mod_fragment", "name": "改装件碎片8", "itemDesc": "改装件碎片说明", "max_stack": 999 },
+        "030400001": { "type": "mod_fragment", "name": "改装件碎片9", "itemDesc": "改装件碎片说明", "max_stack": 999 },
+        "030500001": { "type": "mod_fragment", "name": "改装件碎片10", "itemDesc": "改装件碎片说明", "max_stack": 999 }
+    }
+}
