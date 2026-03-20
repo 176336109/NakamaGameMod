@@ -2,8 +2,8 @@
     "benefit_plans": {
         "vip_monthly": {
             "id": "vip_monthly",
-            "immediateItems": [ { "id": "item_diamond", "count": 180 } ],
-            "dailyItems": [ { "id": "item_diamond", "count": 30 } ],
+            "immediateItems": [ { "id": "gem", "count": 180 } ],
+            "dailyItems": [ { "id": "gem", "count": 30 } ],
             "privileges": {
                 "reviveLimit": 4,
                 "reviveNeedsAd": true,
@@ -17,9 +17,9 @@
         },
         "svip_monthly": {
             "id": "svip_monthly",
-            "immediateItems": [ { "id": "item_diamond", "count": 300 } ],
+            "immediateItems": [ { "id": "gem", "count": 300 } ],
             "dailyItems": [
-                { "id": "item_diamond", "count": 60 },
+                { "id": "gem", "count": 60 },
                 { "id": "010300001", "count": 3 }
             ],
             "privileges": {
