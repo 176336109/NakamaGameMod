@@ -106,7 +106,19 @@ namespace NakamaServerMod.UnitySdk
     {
         public bool success;
         public ItemData item_data;
+        public bool payment_required;
+        public IapOrderInfo order;
         public string error;
+    }
+
+    [Serializable]
+    public class IapOrderInfo
+    {
+        public bool success;
+        public string error;
+        public string order_id;
+        public string provider;
+        public string pay_url;
     }
 
     /// <summary>

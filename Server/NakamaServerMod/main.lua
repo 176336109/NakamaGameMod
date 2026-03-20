@@ -21,8 +21,11 @@ backpack_service.wire(backpack)
 checkin_service.wire_item_gateway(backpack, checkin)
 gacha_service.wire_item_gateway(backpack, gacha)
 shop_service.wire_item_gateway(backpack, shop)
+shop_service.set_iap_service(iap_service)
 vip_svip_service.wire_item_gateway(backpack, vip_svip)
+vip_svip_service.set_iap_service(iap_service)
 iap_service.wire_item_gateway(backpack, iap)
+vip_svip_service.set_iap_domain(iap)
 
 -- 1) Backpack RPCs
 nk.register_rpc(backpack_service.rpc_debug_add_items, "debug_add_items")

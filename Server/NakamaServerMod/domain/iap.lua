@@ -13,9 +13,14 @@ local nk = require("nakama")
 local config = require("config")
 local M = {}
 local backpack_gateway = nil
+local subscription_gateway = nil
 
 function M.set_item_gateway(gateway)
     backpack_gateway = gateway
+end
+
+function M.set_subscription_gateway(gateway)
+    subscription_gateway = gateway
 end
 
 -- 发货主流程：在平台校验通过后执行，负责道具/权益发放与订阅状态写入
@@ -27,6 +32,15 @@ function M.on_purchase_complete(context, purchase)
     local product_id = purchase.product_id
     
     local product_config = config.iap_products[product_id]
+    if not product_config and config.shop and config.shop.goods and config.shop.goods[product_id] then
+        local goods = config.shop.goods[product_id]
+        local is_iap_goods = goods.costType == "rmb" or goods.shopType == "crystal"
+        if is_iap_goods then
+            product_config = {
+                rewards = goods.rewardItems
+            }
+        end
+    end
     
     if not product_config then
         -- Unknown product：通常是客户端传了未配置商品，或服务端配置缺失
@@ -58,6 +72,18 @@ function M.on_purchase_complete(context, purchase)
         end
     end
     
+    if product_config.benefit_plan_id and product_config.duration_days then
+        if not subscription_gateway or type(subscription_gateway.activate_subscription) ~= "function" then
+            nk.logger_error("subscription_gateway not wired in iap domain")
+            return false
+        end
+        local ok_sub, err_sub = subscription_gateway.activate_subscription(context, user_id, product_config.benefit_plan_id, product_config.duration_days, product_id)
+        if not ok_sub then
+            nk.logger_error("Failed to activate subscription: " .. tostring(err_sub))
+            return false
+        end
+    end
+
     -- 订阅示例：duration_days 存在则按“当前时间 + 天数”计算到期并写入 storage
     if product_config.duration_days then
         -- 写入位置：collection=subscription, key=premium_status, user_id=当前用户
