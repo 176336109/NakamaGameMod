@@ -3,9 +3,6 @@ using System.Collections.Generic;
 
 namespace NakamaServerMod.UnitySdk
 {
-    /// <summary>
-    /// VIP/SVIP状态响应
-    /// </summary>
     [Serializable]
     public class VipStatusResponse
     {
@@ -17,9 +14,6 @@ namespace NakamaServerMod.UnitySdk
         public int svip_unclaimed_days;
     }
 
-    /// <summary>
-    /// 复活权限响应
-    /// </summary>
     [Serializable]
     public class RevivePermissionResponse
     {
@@ -28,9 +22,6 @@ namespace NakamaServerMod.UnitySdk
         public int remaining;
     }
 
-    /// <summary>
-    /// 扫荡权限响应
-    /// </summary>
     [Serializable]
     public class SweepPermissionResponse
     {
@@ -39,9 +30,6 @@ namespace NakamaServerMod.UnitySdk
         public int total;
     }
 
-    /// <summary>
-    /// 磁铁权限响应
-    /// </summary>
     [Serializable]
     public class MagnetPermissionResponse
     {
@@ -49,9 +37,6 @@ namespace NakamaServerMod.UnitySdk
         public bool need_ad;
     }
 
-    /// <summary>
-    /// 掠夺战权限响应
-    /// </summary>
     [Serializable]
     public class PlunderPermissionResponse
     {
@@ -61,36 +46,12 @@ namespace NakamaServerMod.UnitySdk
         public int ad_remaining;
     }
 
-    /// <summary>
-    /// 建造队列权限响应
-    /// </summary>
     [Serializable]
     public class QueuePermissionResponse
     {
         public bool can_use_extra_queue;
     }
 
-    /// <summary>
-    /// 记录复活使用请求
-    /// </summary>
-    [Serializable]
-    public class RecordReviveUsageRequest
-    {
-        public bool used_ad;
-    }
-
-    /// <summary>
-    /// 记录掠夺战使用请求
-    /// </summary>
-    [Serializable]
-    public class RecordPlunderUsageRequest
-    {
-        public bool is_ad;
-    }
-
-    /// <summary>
-    /// 通用成功响应
-    /// </summary>
     [Serializable]
     public class SuccessResponse
     {
@@ -98,9 +59,6 @@ namespace NakamaServerMod.UnitySdk
         public string error;
     }
 
-    /// <summary>
-    /// 物品数据响应
-    /// </summary>
     [Serializable]
     public class ItemDataResponse
     {
@@ -121,9 +79,6 @@ namespace NakamaServerMod.UnitySdk
         public string pay_url;
     }
 
-    /// <summary>
-    /// 物品数据
-    /// </summary>
     [Serializable]
     public class ItemData
     {
@@ -163,21 +118,6 @@ namespace NakamaServerMod.UnitySdk
         public int usedSlotCount;
         public long version;
         public long lastCleanupAt;
-    }
-
-    [Serializable]
-    public class InventoryGetItemsRequest
-    {
-        public List<string> item_ids;
-    }
-
-    [Serializable]
-    public class InventoryListRequest
-    {
-        public int page_size;
-        public string cursor;
-        public string item_type;
-        public string itemType;
     }
 
     [Serializable]
@@ -227,15 +167,6 @@ namespace NakamaServerMod.UnitySdk
     }
 
     [Serializable]
-    public class InventoryAllInfoRequest
-    {
-        public int page_size;
-        public int limit;
-        public string item_type;
-        public string itemType;
-    }
-
-    [Serializable]
     public class InventoryAllInfoResponse
     {
         public bool success;
@@ -243,20 +174,6 @@ namespace NakamaServerMod.UnitySdk
         public List<InventoryItemDef> itemDefs;
         public List<InventoryListItem> backpackItems;
         public string cursor;
-    }
-
-    [Serializable]
-    public class InventoryLogListRequest
-    {
-        public int page_size;
-        public string cursor;
-        public long start_ts;
-        public long end_ts;
-        public string source;
-        public string item_id;
-        public string user_id;
-        public string target_user_id;
-        public string admin_token;
     }
 
     [Serializable]
@@ -304,15 +221,6 @@ namespace NakamaServerMod.UnitySdk
     }
 
     [Serializable]
-    public class BackpackMutationRequest
-    {
-        public List<BackpackItem> items;
-        public string source;
-        public string requestId;
-        public object @ref;
-    }
-
-    [Serializable]
     public class BackpackMutationResult
     {
         public bool success;
@@ -336,14 +244,5 @@ namespace NakamaServerMod.UnitySdk
         public bool success;
         public RpcError error;
         public InventoryState state;
-    }
-
-    /// <summary>
-    /// 模拟购买请求
-    /// </summary>
-    [Serializable]
-    public class DebugSimulatePurchaseRequest
-    {
-        public string plan_id;
     }
 }

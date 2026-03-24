@@ -66,12 +66,6 @@ namespace NakamaServerMod.UnitySdk
     }
 
     [Serializable]
-    public sealed class ShopBuyRequest
-    {
-        public string goodsId;
-    }
-
-    [Serializable]
     public sealed class ShopBuyResponse
     {
         public bool success;
