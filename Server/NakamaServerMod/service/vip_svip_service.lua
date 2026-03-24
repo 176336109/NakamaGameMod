@@ -2,6 +2,8 @@ local nk = require("nakama")
 
 local M = {}
 local vip_domain = nil
+local iap_domain = nil
+local iap_service = nil
 
 function M.wire_item_gateway(backpack, vip_svip)
     if type(vip_svip) ~= "table" or type(vip_svip.set_item_gateway) ~= "function" then
@@ -16,6 +18,27 @@ function M.wire_item_gateway(backpack, vip_svip)
 
     vip_svip.set_item_gateway(gateway)
     vip_domain = vip_svip
+end
+
+function M.set_iap_domain(iap)
+    iap_domain = iap
+    if iap_domain and type(iap_domain.set_subscription_gateway) == "function" and vip_domain then
+        iap_domain.set_subscription_gateway({
+            activate_subscription = function(context, user_id, plan_id, duration_days, product_id)
+                if plan_id == "vip_monthly" then
+                    return vip_domain.purchase_vip(context, user_id, duration_days or 30, "IAP购买VIP:" .. tostring(product_id), { skip_immediate_reward = true })
+                end
+                if plan_id == "svip_monthly" then
+                    return vip_domain.purchase_svip(context, user_id, duration_days or 30, "IAP购买SVIP:" .. tostring(product_id), { skip_immediate_reward = true })
+                end
+                return false, "Unsupported benefit_plan_id: " .. tostring(plan_id)
+            end
+        })
+    end
+end
+
+function M.set_iap_service(service)
+    iap_service = service
 end
 
 local function decode_payload(payload)
@@ -35,19 +58,45 @@ end
 function M.rpc_purchase_vip(context, payload)
     if not vip_domain then return service_not_wired() end
     local req = decode_payload(payload)
-    local days = req.days or 30
-    local ok, item_data = vip_domain.purchase_vip(context, context.user_id, days)
-    if not ok then return nk.json_encode({ error = item_data }) end
-    return nk.json_encode({ success = true, item_data = item_data })
+    if not iap_service or type(iap_service.rpc_create_order) ~= "function" then
+        return nk.json_encode({ error = "IAP service not wired" })
+    end
+    local provider = req.provider or "mock"
+    local order_payload = nk.json_encode({
+        product_id = req.product_id or "com.game.monthly_card",
+        provider = provider
+    })
+    local order_raw = iap_service.rpc_create_order(context, order_payload)
+    local ok_decode, order_result = pcall(nk.json_decode, order_raw or "")
+    if not ok_decode or type(order_result) ~= "table" then
+        return nk.json_encode({ success = false, error = "Create order failed" })
+    end
+    if order_result.success == false then
+        return nk.json_encode({ success = false, error = order_result.error or "Create order failed" })
+    end
+    return nk.json_encode({ success = true, payment_required = true, order = order_result })
 end
 
 function M.rpc_purchase_svip(context, payload)
     if not vip_domain then return service_not_wired() end
     local req = decode_payload(payload)
-    local days = req.days or 30
-    local ok, item_data = vip_domain.purchase_svip(context, context.user_id, days)
-    if not ok then return nk.json_encode({ error = item_data }) end
-    return nk.json_encode({ success = true, item_data = item_data })
+    if not iap_service or type(iap_service.rpc_create_order) ~= "function" then
+        return nk.json_encode({ error = "IAP service not wired" })
+    end
+    local provider = req.provider or "mock"
+    local order_payload = nk.json_encode({
+        product_id = req.product_id or "com.game.svip_monthly_card",
+        provider = provider
+    })
+    local order_raw = iap_service.rpc_create_order(context, order_payload)
+    local ok_decode, order_result = pcall(nk.json_decode, order_raw or "")
+    if not ok_decode or type(order_result) ~= "table" then
+        return nk.json_encode({ success = false, error = "Create order failed" })
+    end
+    if order_result.success == false then
+        return nk.json_encode({ success = false, error = order_result.error or "Create order failed" })
+    end
+    return nk.json_encode({ success = true, payment_required = true, order = order_result })
 end
 
 function M.rpc_claim_vip_daily(context, payload)
@@ -74,6 +123,11 @@ end
 function M.rpc_get_vip_status(context, payload)
     if not vip_domain then return service_not_wired() end
     return nk.json_encode(vip_domain.get_vip_status(context, context.user_id))
+end
+
+function M.rpc_get_runtime_snapshot(context, payload)
+    if not vip_domain then return service_not_wired() end
+    return nk.json_encode(vip_domain.get_runtime_snapshot(context, context.user_id))
 end
 
 function M.rpc_check_revive_permission(context, payload)

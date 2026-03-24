@@ -254,7 +254,8 @@ end
 
 
 -- 核心：购买/续费月卡
-local function purchase_subscription(context, user_id, item_id, plan_id, duration_days, log_source)
+local function purchase_subscription(context, user_id, item_id, plan_id, duration_days, log_source, options)
+    options = options or {}
     nk.logger_info(string.format("purchase_subscription: user_id=%s plan_id=%s source=%s", user_id, plan_id, log_source or "nil"))
     local now = os.time()
     local plan_config = config.benefit_plans[plan_id]
@@ -359,7 +360,7 @@ local function purchase_subscription(context, user_id, item_id, plan_id, duratio
     end
     
     -- 3. 发放立即奖励 (普通物品，通过 inventory 模块)
-    if plan_config.immediateItems and #plan_config.immediateItems > 0 then
+    if not options.skip_immediate_reward and plan_config.immediateItems and #plan_config.immediateItems > 0 then
         item_gateway.add_items(context, user_id, plan_config.immediateItems, log_source, { planId = plan_id, type = "purchase" })
     end
     
@@ -448,15 +449,15 @@ end
 -- ================= Exported Functions =================
 
 -- 购买 VIP
-function M.purchase_vip(context, user_id, days, source)
+function M.purchase_vip(context, user_id, days, source, options)
     -- 默认 source 为 "购买VIP"
-    return purchase_subscription(context, user_id, VIP_ITEM_ID, VIP_PLAN_ID, days or 30, source or "购买VIP")
+    return purchase_subscription(context, user_id, VIP_ITEM_ID, VIP_PLAN_ID, days or 30, source or "购买VIP", options)
 end
 
 -- 购买 SVIP
-function M.purchase_svip(context, user_id, days, source)
+function M.purchase_svip(context, user_id, days, source, options)
     -- 默认 source 为 "购买SVIP"
-    return purchase_subscription(context, user_id, SVIP_ITEM_ID, SVIP_PLAN_ID, days or 30, source or "购买SVIP")
+    return purchase_subscription(context, user_id, SVIP_ITEM_ID, SVIP_PLAN_ID, days or 30, source or "购买SVIP", options)
 end
 
 -- 领取 VIP 每日
@@ -505,6 +506,33 @@ function M.get_vip_status(context, user_id)
         svip_remaining_days = svip_item and get_remaining_days(svip_item) or 0,
         vip_unclaimed_days = vip_state and vip_state.pendingClaimDays or 0,
         svip_unclaimed_days = svip_state and svip_state.pendingClaimDays or 0
+    }
+end
+
+function M.get_runtime_snapshot(context, user_id)
+    local reads = {
+        { collection = "backpack", key = VIP_ITEM_ID, user_id = user_id },
+        { collection = "backpack", key = SVIP_ITEM_ID, user_id = user_id }
+    }
+    local objects = nk.storage_read(reads)
+    local vip_item = nil
+    local svip_item = nil
+    for _, obj in ipairs(objects) do
+        if obj.key == VIP_ITEM_ID then vip_item = obj.value end
+        if obj.key == SVIP_ITEM_ID then svip_item = obj.value end
+    end
+
+    local privileges, vip_active, svip_active = get_user_privileges(user_id)
+    local daily_state = get_daily_play_state(user_id)
+
+    return {
+        success = true,
+        privileges = privileges,
+        daily_state = daily_state,
+        vip_item = vip_item,
+        svip_item = svip_item,
+        vip_active = vip_active,
+        svip_active = svip_active
     }
 end
 

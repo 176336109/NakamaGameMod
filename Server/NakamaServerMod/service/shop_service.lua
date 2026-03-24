@@ -4,10 +4,49 @@ local config = require("config")
 local M = {}
 local backpack_gateway = nil
 local shop_domain = nil
+local iap_service = nil
 
 function M.wire_item_gateway(backpack, shop)
     backpack_gateway = backpack
     shop_domain = shop
+end
+
+function M.set_iap_service(service)
+    iap_service = service
+end
+
+local function handle_payment(context, user_id, goods_id, cost_type, cost_value, req)
+    if cost_type == "rmb" then
+        if not iap_service or type(iap_service.rpc_create_order) ~= "function" then
+            return false, nk.json_encode({ success = false, error = "IAP service not wired" })
+        end
+        local provider = req.provider or "mock"
+        local order_payload = nk.json_encode({
+            product_id = req.product_id or goods_id,
+            provider = provider
+        })
+        local order_raw = iap_service.rpc_create_order(context, order_payload)
+        local ok_decode, order_result = pcall(nk.json_decode, order_raw or "")
+        if not ok_decode or type(order_result) ~= "table" then
+            return false, nk.json_encode({ success = false, error = "Create order failed" })
+        end
+        if order_result.success == false then
+            return false, nk.json_encode({ success = false, error = order_result.error or "Create order failed" })
+        end
+        return false, nk.json_encode({
+            success = true,
+            payment_required = true,
+            goodsId = goods_id,
+            order = order_result
+        })
+    end
+
+    local ok_cost, err_cost = backpack_gateway.consume_items(context, user_id, {{ id = cost_type, count = cost_value }}, "shop_buy_" .. goods_id)
+    if not ok_cost then
+        return false, nk.json_encode({ success = false, error = "Insufficient funds: " .. (err_cost or "") })
+    end
+
+    return true, nil
 end
 
 function M.rpc_shop_get_state(context, payload)
@@ -79,12 +118,9 @@ function M.rpc_shop_buy(context, payload)
         end
     end
 
-    local ok_cost, err_cost = true, nil
-    if cfg.shopType ~= "crystal" then
-        ok_cost, err_cost = backpack_gateway.consume_items(context, user_id, {{ id = cost_type, count = cost_value }}, "shop_buy_" .. goods_id)
-        if not ok_cost then
-            return nk.json_encode({ success = false, error = "Insufficient funds: " .. (err_cost or "") })
-        end
+    local paid, payment_response = handle_payment(context, user_id, goods_id, cost_type, cost_value, req)
+    if not paid then
+        return payment_response
     end
 
     local ok_reward, err_reward = backpack_gateway.add_items(context, user_id, cfg.rewardItems, "shop_buy_" .. goods_id)

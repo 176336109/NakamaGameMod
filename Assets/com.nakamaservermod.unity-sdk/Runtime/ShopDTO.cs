@@ -77,5 +77,7 @@ namespace NakamaServerMod.UnitySdk
         public bool success;
         public string error;
         public int progress;
+        public bool payment_required;
+        public IapOrderInfo order;
     }
 }
