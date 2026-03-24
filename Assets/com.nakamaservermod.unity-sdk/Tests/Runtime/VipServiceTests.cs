@@ -15,6 +15,53 @@ namespace NakamaServerMod.UnitySdk.Tests
             public string product_id;
         }
 
+        [Serializable]
+        private class VipRuntimeSnapshotResponse
+        {
+            public bool success;
+            public VipRuntimePrivileges privileges;
+            public VipRuntimeDailyState daily_state;
+            public VipRuntimeItem vip_item;
+            public VipRuntimeItem svip_item;
+            public bool vip_active;
+            public bool svip_active;
+        }
+
+        [Serializable]
+        private class VipRuntimePrivileges
+        {
+            public int reviveLimit;
+            public bool reviveNeedsAd;
+            public int sweepLimit;
+            public bool magnetNeedsAd;
+            public int plunderBaseLimit;
+            public int plunderAdLimit;
+            public bool queueExtraEnabled;
+            public bool svipBadgeEnabled;
+        }
+
+        [Serializable]
+        private class VipRuntimeDailyState
+        {
+            public string dateKey;
+            public int reviveUsed;
+            public int reviveAdUsed;
+            public int sweepUsed;
+            public int plunderBaseUsed;
+            public int plunderAdUsed;
+        }
+
+        [Serializable]
+        private class VipRuntimeItem
+        {
+            public string itemId;
+            public string type;
+            public long startAt;
+            public long expireAt;
+            public string benefitPlanId;
+            public long count;
+        }
+
         // 辅助方法：创建客户端并以带有时间戳和测试名称的 DeviceID/Username 注册新账号
         private async Task<GameClient> CreateAuthenticatedClientAsync(string testName = "UnknownTest")
         {
@@ -268,6 +315,31 @@ namespace NakamaServerMod.UnitySdk.Tests
             // - 所有状态均未激活 (active == false)
             // - 剩余天数为 0
             // - 可领取天数为 0
+        }
+
+        [Test]
+        public async Task TestGetVipRuntimeSnapshot()
+        {
+            var client = await CreateAuthenticatedClientAsync("VIP运行态快照测试");
+            var vipService = new VipService(client);
+
+            await CompleteVipPurchaseAsync(client, vipService);
+            await CompleteSvipPurchaseAsync(client, vipService);
+
+            var snapshot = await client.RpcAsync<string, VipRuntimeSnapshotResponse>("vip_runtime_snapshot", "{}");
+            Assert.IsNotNull(snapshot);
+            Assert.IsTrue(snapshot.success);
+            Assert.IsTrue(snapshot.vip_active);
+            Assert.IsTrue(snapshot.svip_active);
+            Assert.IsNotNull(snapshot.privileges);
+            Assert.IsNotNull(snapshot.daily_state);
+            Assert.IsFalse(string.IsNullOrEmpty(snapshot.daily_state.dateKey));
+            Assert.IsNotNull(snapshot.vip_item);
+            Assert.IsNotNull(snapshot.svip_item);
+            Assert.AreEqual("item_vip_active", snapshot.vip_item.itemId);
+            Assert.AreEqual("item_svip_active", snapshot.svip_item.itemId);
+            Assert.IsTrue(snapshot.privileges.queueExtraEnabled);
+            Assert.IsTrue(snapshot.privileges.svipBadgeEnabled);
         }
 
         /// <summary>

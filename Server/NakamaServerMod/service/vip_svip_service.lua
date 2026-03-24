@@ -125,6 +125,11 @@ function M.rpc_get_vip_status(context, payload)
     return nk.json_encode(vip_domain.get_vip_status(context, context.user_id))
 end
 
+function M.rpc_get_runtime_snapshot(context, payload)
+    if not vip_domain then return service_not_wired() end
+    return nk.json_encode(vip_domain.get_runtime_snapshot(context, context.user_id))
+end
+
 function M.rpc_check_revive_permission(context, payload)
     if not vip_domain then return service_not_wired() end
     return nk.json_encode(vip_domain.check_revive_permission(context, context.user_id))

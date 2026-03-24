@@ -15,6 +15,40 @@ function M.set_iap_service(service)
     iap_service = service
 end
 
+local function handle_payment(context, user_id, goods_id, cost_type, cost_value, req)
+    if cost_type == "rmb" then
+        if not iap_service or type(iap_service.rpc_create_order) ~= "function" then
+            return false, nk.json_encode({ success = false, error = "IAP service not wired" })
+        end
+        local provider = req.provider or "mock"
+        local order_payload = nk.json_encode({
+            product_id = req.product_id or goods_id,
+            provider = provider
+        })
+        local order_raw = iap_service.rpc_create_order(context, order_payload)
+        local ok_decode, order_result = pcall(nk.json_decode, order_raw or "")
+        if not ok_decode or type(order_result) ~= "table" then
+            return false, nk.json_encode({ success = false, error = "Create order failed" })
+        end
+        if order_result.success == false then
+            return false, nk.json_encode({ success = false, error = order_result.error or "Create order failed" })
+        end
+        return false, nk.json_encode({
+            success = true,
+            payment_required = true,
+            goodsId = goods_id,
+            order = order_result
+        })
+    end
+
+    local ok_cost, err_cost = backpack_gateway.consume_items(context, user_id, {{ id = cost_type, count = cost_value }}, "shop_buy_" .. goods_id)
+    if not ok_cost then
+        return false, nk.json_encode({ success = false, error = "Insufficient funds: " .. (err_cost or "") })
+    end
+
+    return true, nil
+end
+
 function M.rpc_shop_get_state(context, payload)
     if not shop_domain or type(shop_domain.get_state_data) ~= "function" then
         return nk.json_encode({ success = false, error = "Shop service not wired" })
@@ -84,36 +118,9 @@ function M.rpc_shop_buy(context, payload)
         end
     end
 
-    local is_iap_goods = (cost_type == "rmb" or cfg.shopType == "crystal")
-    if is_iap_goods then
-        if not iap_service or type(iap_service.rpc_create_order) ~= "function" then
-            return nk.json_encode({ success = false, error = "IAP service not wired" })
-        end
-        local provider = req.provider or "mock"
-        local order_payload = nk.json_encode({
-            product_id = req.product_id or goods_id,
-            provider = provider
-        })
-        local order_raw = iap_service.rpc_create_order(context, order_payload)
-        local ok_decode, order_result = pcall(nk.json_decode, order_raw or "")
-        if not ok_decode or type(order_result) ~= "table" then
-            return nk.json_encode({ success = false, error = "Create order failed" })
-        end
-        if order_result.success == false then
-            return nk.json_encode({ success = false, error = order_result.error or "Create order failed" })
-        end
-        return nk.json_encode({
-            success = true,
-            payment_required = true,
-            goodsId = goods_id,
-            order = order_result
-        })
-    end
-
-    local ok_cost, err_cost = true, nil
-    ok_cost, err_cost = backpack_gateway.consume_items(context, user_id, {{ id = cost_type, count = cost_value }}, "shop_buy_" .. goods_id)
-    if not ok_cost then
-        return nk.json_encode({ success = false, error = "Insufficient funds: " .. (err_cost or "") })
+    local paid, payment_response = handle_payment(context, user_id, goods_id, cost_type, cost_value, req)
+    if not paid then
+        return payment_response
     end
 
     local ok_reward, err_reward = backpack_gateway.add_items(context, user_id, cfg.rewardItems, "shop_buy_" .. goods_id)

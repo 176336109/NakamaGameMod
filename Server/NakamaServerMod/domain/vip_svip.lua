@@ -509,6 +509,33 @@ function M.get_vip_status(context, user_id)
     }
 end
 
+function M.get_runtime_snapshot(context, user_id)
+    local reads = {
+        { collection = "backpack", key = VIP_ITEM_ID, user_id = user_id },
+        { collection = "backpack", key = SVIP_ITEM_ID, user_id = user_id }
+    }
+    local objects = nk.storage_read(reads)
+    local vip_item = nil
+    local svip_item = nil
+    for _, obj in ipairs(objects) do
+        if obj.key == VIP_ITEM_ID then vip_item = obj.value end
+        if obj.key == SVIP_ITEM_ID then svip_item = obj.value end
+    end
+
+    local privileges, vip_active, svip_active = get_user_privileges(user_id)
+    local daily_state = get_daily_play_state(user_id)
+
+    return {
+        success = true,
+        privileges = privileges,
+        daily_state = daily_state,
+        vip_item = vip_item,
+        svip_item = svip_item,
+        vip_active = vip_active,
+        svip_active = svip_active
+    }
+end
+
 -- 检查复活权限
 function M.check_revive_permission(context, user_id)
     local priv, _, _ = get_user_privileges(user_id)
