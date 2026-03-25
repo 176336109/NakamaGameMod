@@ -55,9 +55,9 @@ local function get_cycle_info(user_id)
     local cycle_no = math.floor(days_diff / 7) + 1
     
     -- currentDayIndex = (diffDays % 7) + 1
-    local current_cycle_day = (days_diff % 7) + 1
+    local current_day_index = (days_diff % 7) + 1
     
-    return cycle_no, current_cycle_day, current_day
+    return cycle_no, current_day_index, current_day
 end
 
 -- Load state from storage
@@ -90,15 +90,57 @@ local function save_state(user_id, state, version)
     nk.storage_write({ write_obj })
 end
 
-local function reset_cycle_state(cycle_id_str, old_state)
+local function build_unsigned_day_states()
+    local day_states = {}
+    for i = 1, 7 do
+        day_states[i] = { dayIndex = i, status = "unsigned" }
+    end
+    return day_states
+end
+
+local function reset_cycle_state(cycle_id_str, old_state, current_day_index, current_day)
+    local cycle_start_date = current_day - (current_day_index - 1)
+    local cycle_end_date = cycle_start_date + 6
     local state = {
         cycleId = cycle_id_str,
-        days = {}
+        cycleStartDate = cycle_start_date,
+        cycleEndDate = cycle_end_date,
+        currentDayIndex = current_day_index,
+        lastRefreshDate = current_day,
+        days = {},
+        dayStates = build_unsigned_day_states()
     }
     if type(old_state) == "table" and old_state.time_offset ~= nil then
         state.time_offset = tonumber(old_state.time_offset) or 0
     end
     return state
+end
+
+local function ensure_cycle_snapshot_fields(state, current_day_index, current_day)
+    local cycle_start_date = current_day - (current_day_index - 1)
+    local cycle_end_date = cycle_start_date + 6
+    local changed = false
+    if state.cycleStartDate ~= cycle_start_date then
+        state.cycleStartDate = cycle_start_date
+        changed = true
+    end
+    if state.cycleEndDate ~= cycle_end_date then
+        state.cycleEndDate = cycle_end_date
+        changed = true
+    end
+    if state.currentDayIndex ~= current_day_index then
+        state.currentDayIndex = current_day_index
+        changed = true
+    end
+    if state.lastRefreshDate ~= current_day then
+        state.lastRefreshDate = current_day
+        changed = true
+    end
+    if type(state.dayStates) ~= "table" or #state.dayStates ~= 7 then
+        state.dayStates = build_unsigned_day_states()
+        changed = true
+    end
+    return changed
 end
 
 -- Helper to make error response
@@ -133,7 +175,7 @@ local function normalize_items(items)
 end
 
 function M.get_state_data(user_id)
-    local cycle_no, cycle_day = get_cycle_info(user_id)
+    local cycle_no, current_day_index, current_day = get_cycle_info(user_id)
     local cycle_id_str = "C" .. tostring(cycle_no)
     local state, version = load_state(user_id)
     local needs_snapshot = false
@@ -142,11 +184,14 @@ function M.get_state_data(user_id)
         needs_snapshot = true
     end
     if not state.cycleId or state.cycleId ~= cycle_id_str then
-        state = reset_cycle_state(cycle_id_str, state)
+        state = reset_cycle_state(cycle_id_str, state, current_day_index, current_day)
         needs_snapshot = true
     end
     if type(state.days) ~= "table" then
         state.days = {}
+        needs_snapshot = true
+    end
+    if ensure_cycle_snapshot_fields(state, current_day_index, current_day) then
         needs_snapshot = true
     end
     if needs_snapshot then
@@ -166,9 +211,9 @@ function M.get_state_data(user_id)
                 status = "signed"
             end
         else
-            if i < cycle_day then
+            if i < current_day_index then
                 status = "missed"
-            elseif i == cycle_day then
+            elseif i == current_day_index then
                 status = "claimable"
             else
                 status = "locked"
@@ -186,11 +231,31 @@ function M.get_state_data(user_id)
 
     return {
         cycle_no = cycle_no,
-        current_cycle_day = cycle_day,
+        cycleNo = cycle_no,
+        currentDayIndex = current_day_index,
         days = days_info,
         makeup_cost = makeup_cost_resp,
         timestamp = os.time()
     }
+end
+
+function M.set_day_claimed(state, day_index, status, claim_type, claim_at)
+    if type(state) ~= "table" then
+        return
+    end
+    if type(state.dayStates) ~= "table" then
+        state.dayStates = build_unsigned_day_states()
+    end
+    local idx = tonumber(day_index) or 0
+    if idx < 1 or idx > 7 then
+        return
+    end
+    local slot = state.dayStates[idx] or { dayIndex = idx, status = "unsigned" }
+    slot.dayIndex = idx
+    slot.status = status
+    slot.claimAt = claim_at
+    slot.claimType = claim_type
+    state.dayStates[idx] = slot
 end
 
 function M.set_time_offset(user_id, offset)

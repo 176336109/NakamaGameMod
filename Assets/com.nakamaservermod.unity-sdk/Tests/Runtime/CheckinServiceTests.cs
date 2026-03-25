@@ -48,7 +48,7 @@ namespace NakamaServerMod.UnitySdk.Tests
             // 验证结果
             Assert.IsNotNull(state);
             Assert.AreEqual(1, state.cycle_no);
-            Assert.AreEqual(1, state.current_cycle_day);
+            Assert.AreEqual(1, state.currentDayIndex);
             Assert.AreEqual(7, state.days.Count);
             
             foreach (var day in state.days)
@@ -60,7 +60,7 @@ namespace NakamaServerMod.UnitySdk.Tests
             }
 
             // --- Final Result Verification ---
-            // 预期结果：cycle_no=1, current_cycle_day=1, 第1天状态为可领取，其余为锁定
+            // 预期结果：cycle_no=1, currentDayIndex=1, 第1天状态为可领取，其余为锁定
         }
 
         [Test]
@@ -101,7 +101,7 @@ namespace NakamaServerMod.UnitySdk.Tests
             await SetTimeOffsetAsync(client, 86400);
 
             var state = await service.GetStateAsync();
-            Assert.AreEqual(2, state.current_cycle_day);
+            Assert.AreEqual(2, state.currentDayIndex);
             Assert.AreEqual("claimable", state.days[1].status);
 
             var result = await service.DailyCheckinAsync();
@@ -128,7 +128,7 @@ namespace NakamaServerMod.UnitySdk.Tests
             await SetTimeOffsetAsync(client, 86400);
 
             var state = await service.GetStateAsync();
-            Assert.AreEqual(2, state.current_cycle_day);
+            Assert.AreEqual(2, state.currentDayIndex);
             Assert.AreEqual("missed", state.days[0].status);
             Assert.AreEqual("claimable", state.days[1].status);
 
@@ -244,7 +244,7 @@ namespace NakamaServerMod.UnitySdk.Tests
             await SetTimeOffsetAsync(client, 6 * 86400);
             
             var state = await service.GetStateAsync();
-            Assert.AreEqual(7, state.current_cycle_day);
+            Assert.AreEqual(7, state.currentDayIndex);
             Assert.AreEqual("claimable", state.days[6].status);
 
             // --- Final Result Verification ---
@@ -263,12 +263,12 @@ namespace NakamaServerMod.UnitySdk.Tests
 
             var state = await service.GetStateAsync();
             Assert.AreEqual(2, state.cycle_no);
-            Assert.AreEqual(1, state.current_cycle_day);
+            Assert.AreEqual(1, state.currentDayIndex);
             Assert.AreEqual("claimable", state.days[0].status);
             Assert.AreEqual("locked", state.days[1].status);
 
             // --- Final Result Verification ---
-            // 预期结果：进入第2周期，cycle_no=2，current_cycle_day=1，所有历史状态重置
+            // 预期结果：进入第2周期，cycle_no=2，currentDayIndex=1，所有历史状态重置
         }
 
         [Test]
@@ -497,7 +497,7 @@ namespace NakamaServerMod.UnitySdk.Tests
             await SetTimeOffsetAsync(client, 86400);
 
             var state = await service.GetStateAsync();
-            Assert.AreEqual(2, state.current_cycle_day);
+            Assert.AreEqual(2, state.currentDayIndex);
             Assert.AreEqual("claimable", state.days[1].status);
 
             // --- Final Result Verification ---
@@ -515,7 +515,7 @@ namespace NakamaServerMod.UnitySdk.Tests
             await SetTimeOffsetAsync(client, 86400);
 
             var state = await service.GetStateAsync();
-            Assert.AreEqual(2, state.current_cycle_day);
+            Assert.AreEqual(2, state.currentDayIndex);
             Assert.AreEqual("missed", state.days[0].status);
             Assert.AreEqual("claimable", state.days[1].status);
 
@@ -563,7 +563,7 @@ namespace NakamaServerMod.UnitySdk.Tests
             // Current Day Index = (Day 10 - Day 7) + 1 = 4.
             
             Assert.AreEqual(2, state.cycle_no);
-            Assert.AreEqual(4, state.current_cycle_day);
+            Assert.AreEqual(4, state.currentDayIndex);
             Assert.AreEqual("claimable", state.days[3].status); // Day 4 is index 3
 
             // --- Final Result Verification ---
@@ -613,7 +613,7 @@ namespace NakamaServerMod.UnitySdk.Tests
             var state2 = await service.GetStateAsync();
 
             Assert.AreEqual(state1.cycle_no, state2.cycle_no);
-            Assert.AreEqual(state1.current_cycle_day, state2.current_cycle_day);
+            Assert.AreEqual(state1.currentDayIndex, state2.currentDayIndex);
 
             // --- Final Result Verification ---
             // 预期结果：多次查询状态一致，不会重复创建周期
@@ -647,7 +647,7 @@ namespace NakamaServerMod.UnitySdk.Tests
             // Current Day Index = 1 + 1 = 2.
             
             Assert.AreEqual(1, state.cycle_no);
-            Assert.AreEqual(2, state.current_cycle_day);
+            Assert.AreEqual(2, state.currentDayIndex);
             Assert.AreEqual("missed", state.days[0].status); // Day 1 missed
             Assert.AreEqual("claimable", state.days[1].status); // Day 2 claimable
 
