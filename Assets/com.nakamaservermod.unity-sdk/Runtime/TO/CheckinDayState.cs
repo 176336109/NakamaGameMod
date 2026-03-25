@@ -10,7 +10,7 @@ namespace NakamaServerMod.UnitySdk
     public sealed class CheckinDayState
     {
         public int day_index; // 天序号
-        public string status; // 状态值（locked/missed/claimable/signed/makeup_signed）
+        public string status; // 状态值（unsigned/signed/makeup_signed/locked）
         public List<ItemStack> rewards; // 当日奖励列表
 
         public CheckinDayState()
