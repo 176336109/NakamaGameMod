@@ -202,7 +202,7 @@ function M.get_state_data(user_id)
     local checkin_cfg = config.checkin or {}
     local rewards_cfg = checkin_cfg.rewards or {}
     for i = 1, 7 do
-        local status = "locked"
+        local status = "unsigned"
         local saved_day_data = state.days[tostring(i)]
         if saved_day_data then
             if saved_day_data.status == "makeup_signed" then
@@ -211,11 +211,7 @@ function M.get_state_data(user_id)
                 status = "signed"
             end
         else
-            if i < current_day_index then
-                status = "missed"
-            elseif i == current_day_index then
-                status = "claimable"
-            else
+            if i > current_day_index then
                 status = "locked"
             end
         end

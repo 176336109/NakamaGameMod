@@ -54,7 +54,7 @@ namespace NakamaServerMod.UnitySdk.Tests
             foreach (var day in state.days)
             {
                 if (day.day_index == 1)
-                    Assert.AreEqual("claimable", day.status);
+                    Assert.AreEqual("unsigned", day.status);
                 else
                     Assert.AreEqual("locked", day.status);
             }
@@ -102,7 +102,7 @@ namespace NakamaServerMod.UnitySdk.Tests
 
             var state = await service.GetStateAsync();
             Assert.AreEqual(2, state.currentDayIndex);
-            Assert.AreEqual("claimable", state.days[1].status);
+            Assert.AreEqual("unsigned", state.days[1].status);
 
             var result = await service.DailyCheckinAsync();
             Assert.IsTrue(result.success);
@@ -129,8 +129,8 @@ namespace NakamaServerMod.UnitySdk.Tests
 
             var state = await service.GetStateAsync();
             Assert.AreEqual(2, state.currentDayIndex);
-            Assert.AreEqual("missed", state.days[0].status);
-            Assert.AreEqual("claimable", state.days[1].status);
+            Assert.AreEqual("unsigned", state.days[0].status);
+            Assert.AreEqual("unsigned", state.days[1].status);
 
             var result = await service.MakeupAsync(1);
             Assert.IsTrue(result.success);
@@ -162,7 +162,7 @@ namespace NakamaServerMod.UnitySdk.Tests
             Assert.AreEqual(2, result.day_index);
 
             var state = await service.GetStateAsync();
-            Assert.AreEqual("missed", state.days[0].status); // 第1天仍漏签
+            Assert.AreEqual("unsigned", state.days[0].status); // 第1天仍漏签
             Assert.AreEqual("makeup_signed", state.days[1].status); // 第2天补签
             Assert.AreEqual("signed", state.days[2].status); // 第3天已签
 
@@ -245,7 +245,7 @@ namespace NakamaServerMod.UnitySdk.Tests
             
             var state = await service.GetStateAsync();
             Assert.AreEqual(7, state.currentDayIndex);
-            Assert.AreEqual("claimable", state.days[6].status);
+            Assert.AreEqual("unsigned", state.days[6].status);
 
             // --- Final Result Verification ---
             // 预期结果：周期推进到第7天，第7天可领取
@@ -264,7 +264,7 @@ namespace NakamaServerMod.UnitySdk.Tests
             var state = await service.GetStateAsync();
             Assert.AreEqual(2, state.cycle_no);
             Assert.AreEqual(1, state.currentDayIndex);
-            Assert.AreEqual("claimable", state.days[0].status);
+            Assert.AreEqual("unsigned", state.days[0].status);
             Assert.AreEqual("locked", state.days[1].status);
 
             // --- Final Result Verification ---
@@ -415,7 +415,7 @@ namespace NakamaServerMod.UnitySdk.Tests
 
             // 检查结果：应该只有1次成功，水晶只扣1次 (20)
             var state = await service.GetStateAsync();
-            Assert.AreEqual("makeup_signed", state.days[0].status);
+            Assert.AreEqual("signed", state.days[0].status);
             
             // 检查水晶余额 (需额外RPC支持查询余额，或者通过日志推断)
             // 这里我们假设如果状态正确且未报错，则服务端处理了并发
@@ -477,7 +477,7 @@ namespace NakamaServerMod.UnitySdk.Tests
             }
 
             var state = await service.GetStateAsync();
-            Assert.AreEqual("makeup_signed", state.days[0].status);
+            Assert.AreEqual("signed", state.days[0].status);
 
             // --- Final Result Verification ---
             // 预期结果：并发补签只能成功一次
@@ -498,7 +498,7 @@ namespace NakamaServerMod.UnitySdk.Tests
 
             var state = await service.GetStateAsync();
             Assert.AreEqual(2, state.currentDayIndex);
-            Assert.AreEqual("claimable", state.days[1].status);
+            Assert.AreEqual("unsigned", state.days[1].status);
 
             // --- Final Result Verification ---
             // 预期结果：跨天后进入第二天，可领取第二天奖励
@@ -516,8 +516,8 @@ namespace NakamaServerMod.UnitySdk.Tests
 
             var state = await service.GetStateAsync();
             Assert.AreEqual(2, state.currentDayIndex);
-            Assert.AreEqual("missed", state.days[0].status);
-            Assert.AreEqual("claimable", state.days[1].status);
+            Assert.AreEqual("unsigned", state.days[0].status);
+            Assert.AreEqual("unsigned", state.days[1].status);
 
             // --- Final Result Verification ---
             // 预期结果：第1天变为漏签，第2天可领取
@@ -537,7 +537,7 @@ namespace NakamaServerMod.UnitySdk.Tests
             var state = await service.GetStateAsync();
             Assert.AreEqual(2, state.cycle_no);
             // 第1周期的天数已重置
-            Assert.AreEqual("claimable", state.days[0].status); // 第2周期的第1天
+            Assert.AreEqual("unsigned", state.days[0].status); // 第2周期的第1天
             
             // --- Final Result Verification ---
             // 预期结果：跨周期后，上一周期的漏签失效，无法补签
@@ -564,7 +564,7 @@ namespace NakamaServerMod.UnitySdk.Tests
             
             Assert.AreEqual(2, state.cycle_no);
             Assert.AreEqual(4, state.currentDayIndex);
-            Assert.AreEqual("claimable", state.days[3].status); // Day 4 is index 3
+            Assert.AreEqual("unsigned", state.days[3].status); // Day 4 is index 3
 
             // --- Final Result Verification ---
             // 预期结果：正确计算周期为第2周期第4天
@@ -593,7 +593,7 @@ namespace NakamaServerMod.UnitySdk.Tests
             Assert.AreEqual("makeup_signed", state.days[1].status);
             Assert.AreEqual("makeup_signed", state.days[2].status);
             Assert.AreEqual("makeup_signed", state.days[3].status);
-            Assert.AreEqual("missed", state.days[4].status); // Day 5 still missed
+            Assert.AreEqual("unsigned", state.days[4].status); // Day 5 still missed
 
             // --- Final Result Verification ---
             // 预期结果：多次补签均成功
@@ -648,8 +648,8 @@ namespace NakamaServerMod.UnitySdk.Tests
             
             Assert.AreEqual(1, state.cycle_no);
             Assert.AreEqual(2, state.currentDayIndex);
-            Assert.AreEqual("missed", state.days[0].status); // Day 1 missed
-            Assert.AreEqual("claimable", state.days[1].status); // Day 2 claimable
+            Assert.AreEqual("unsigned", state.days[0].status); // Day 1 missed
+            Assert.AreEqual("unsigned", state.days[1].status); // Day 2 claimable
 
             // --- Final Result Verification ---
             // 预期结果：正确识别为第2天，第1天算漏签
