@@ -764,7 +764,11 @@ local function normalize_item_type_filter(v)
         return nil
     end
     local s = tostring(v)
+    s = s:gsub("^%s+", ""):gsub("%s+$", "")
     if s == "" then
+        return nil
+    end
+    if string.lower(s) == "all" then
         return nil
     end
     return s

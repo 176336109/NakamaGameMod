@@ -2,11 +2,14 @@ using System;
 
 namespace NakamaServerMod.UnitySdk
 {
+    /// <summary>
+    /// 抽卡请求
+    /// </summary>
     [Serializable]
     public sealed class GachaPullRequest
     {
-        public string banner_id;
-        public int count;
+        public string banner_id; // 卡池ID
+        public int count; // 抽卡次数
 
         public GachaPullRequest()
         {

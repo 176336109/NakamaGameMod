@@ -135,9 +135,22 @@ end
 function M.get_state_data(user_id)
     local cycle_no, cycle_day = get_cycle_info(user_id)
     local cycle_id_str = "C" .. tostring(cycle_no)
-    local state = load_state(user_id)
+    local state, version = load_state(user_id)
+    local needs_snapshot = false
+    if type(state) ~= "table" then
+        state = {}
+        needs_snapshot = true
+    end
     if not state.cycleId or state.cycleId ~= cycle_id_str then
         state = reset_cycle_state(cycle_id_str, state)
+        needs_snapshot = true
+    end
+    if type(state.days) ~= "table" then
+        state.days = {}
+        needs_snapshot = true
+    end
+    if needs_snapshot then
+        save_state(user_id, state, version)
     end
 
     local days_info = {}
