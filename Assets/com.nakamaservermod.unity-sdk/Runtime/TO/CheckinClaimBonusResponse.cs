@@ -3,18 +3,21 @@ using System.Collections.Generic;
 
 namespace NakamaServerMod.UnitySdk
 {
+    /// <summary>
+    /// 签到补领响应
+    /// </summary>
     [Serializable]
     public sealed class CheckinClaimBonusResponse
     {
-        public bool success;
-        public int day_id;
-        public List<ItemStack> rewards;
-        public string gating_mode;
-        public int player_level;
-        public int required_level;
-        public int cycle_no;
-        public string error;
-        public string error_code;
+        public bool success; // 是否成功
+        public int day_id; // 补领天ID
+        public List<ItemStack> rewards; // 奖励列表
+        public string gating_mode; // 开放条件模式
+        public int player_level; // 玩家当前等级
+        public int required_level; // 所需等级
+        public int cycle_no; // 周期编号
+        public string error; // 错误信息
+        public string error_code; // 错误码
 
         public CheckinClaimBonusResponse()
         {
