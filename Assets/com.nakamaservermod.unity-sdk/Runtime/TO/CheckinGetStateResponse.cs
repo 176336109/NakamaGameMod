@@ -10,7 +10,7 @@ namespace NakamaServerMod.UnitySdk
     public sealed class CheckinGetStateResponse
     {
         public int cycle_no; // 当前签到周期号
-        public int current_cycle_day; // 当前周期进行到的天数
+        public int currentDayIndex; // 当前周期进行到的天数
         public List<CheckinDayState> days; // 全部天状态
         public ItemStack makeup_cost; // 补签消耗
         public long timestamp; // 服务器时间戳
