@@ -13,5 +13,6 @@ namespace NakamaServerMod.UnitySdk
         public List<ItemStack> rewards; // 补签奖励
         public int day_index; // 补签天索引
         public string status; // 补签后状态
+        public List<WalletChange> wallet_changes; // 钱包变更
     }
 }

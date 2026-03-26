@@ -34,6 +34,24 @@ namespace NakamaServerMod.UnitySdk.Tests
             await client.RpcAsync<string, object>("debug_add_items", payload);
         }
 
+        private WalletChange FindWalletChange(List<WalletChange> changes, string currencyId)
+        {
+            if (changes == null)
+            {
+                return null;
+            }
+
+            foreach (var change in changes)
+            {
+                if (change != null && change.id == currencyId)
+                {
+                    return change;
+                }
+            }
+
+            return null;
+        }
+
         // --- C 系列：核心场景用例 ---
 
         [Test]
@@ -50,6 +68,12 @@ namespace NakamaServerMod.UnitySdk.Tests
             Assert.AreEqual(1, state.cycle_no);
             Assert.AreEqual(1, state.currentDayIndex);
             Assert.AreEqual(7, state.days.Count);
+            Assert.IsNotNull(state.days[0].rewards);
+            Assert.AreEqual("gold", state.days[0].rewards[0].id);
+            Assert.AreEqual(100, state.days[0].rewards[0].count);
+            Assert.IsNotNull(state.makeup_cost);
+            Assert.AreEqual("gem", state.makeup_cost.id);
+            Assert.AreEqual(20, state.makeup_cost.count);
             
             foreach (var day in state.days)
             {
@@ -79,6 +103,10 @@ namespace NakamaServerMod.UnitySdk.Tests
             Assert.IsNotNull(result.rewards);
             Assert.AreEqual("gold", result.rewards[0].id); // 对应金币
             Assert.AreEqual(100, result.rewards[0].count); // Spec: 100
+            var goldChange = FindWalletChange(result.wallet_changes, "gold");
+            Assert.IsNotNull(goldChange);
+            Assert.AreEqual(100, goldChange.delta);
+            Assert.AreEqual(goldChange.before + 100, goldChange.after);
 
             var state = await service.GetStateAsync();
             Assert.AreEqual("signed", state.days[0].status);
@@ -137,6 +165,12 @@ namespace NakamaServerMod.UnitySdk.Tests
             Assert.AreEqual(1, result.day_index);
             Assert.AreEqual("makeup_signed", result.status);
             Assert.AreEqual("gold", result.rewards[0].id);
+            var goldChange = FindWalletChange(result.wallet_changes, "gold");
+            Assert.IsNotNull(goldChange);
+            Assert.AreEqual(100, goldChange.delta);
+            var gemChange = FindWalletChange(result.wallet_changes, "gem");
+            Assert.IsNotNull(gemChange);
+            Assert.AreEqual(-20, gemChange.delta);
 
             // --- Final Result Verification ---
             // 预期结果：补签第1天成功，扣除水晶，获得第1天奖励，状态变为补签已签到

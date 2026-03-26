@@ -1,7 +1,5 @@
 {
     "items": {
-        "1": { "type": "currency", "name": "金币", "itemDesc": "金币说明" },
-        "2": { "type": "currency", "name": "水晶", "itemDesc": "水晶说明" },
         "gold": { "type": "currency", "name": "金币", "itemDesc": "金币说明" },
         "gem": { "type": "currency", "name": "水晶", "itemDesc": "水晶说明" },
         "energy": { "type": "currency", "name": "Energy", "itemDesc": "Energy说明" },

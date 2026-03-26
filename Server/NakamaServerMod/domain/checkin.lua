@@ -199,6 +199,7 @@ function M.get_state_data(user_id)
     end
 
     local days_info = {}
+    local day_rewards = {}
     local checkin_cfg = config.checkin or {}
     local rewards_cfg = checkin_cfg.rewards or {}
     for i = 1, 7 do
@@ -215,14 +216,15 @@ function M.get_state_data(user_id)
                 status = "locked"
             end
         end
-        local reward = normalize_items(rewards_cfg[i] or {})
-        table.insert(days_info, { day_index = i, status = status, rewards = reward })
+        local rewards = normalize_items(rewards_cfg[i] or {})
+        day_rewards[i] = rewards
+        table.insert(days_info, { day_index = i, status = status, rewards = rewards })
     end
 
     local makeup_cost_cfg = checkin_cfg.makeup_cost
     local makeup_cost_resp = nil
     if makeup_cost_cfg then
-        makeup_cost_resp = { id = makeup_cost_cfg.item_id, count = makeup_cost_cfg.count }
+        makeup_cost_resp = normalize_item(makeup_cost_cfg)
     end
 
     return {
@@ -230,6 +232,7 @@ function M.get_state_data(user_id)
         cycleNo = cycle_no,
         currentDayIndex = current_day_index,
         days = days_info,
+        day_rewards = day_rewards,
         makeup_cost = makeup_cost_resp,
         timestamp = os.time()
     }

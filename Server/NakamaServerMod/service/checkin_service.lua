@@ -5,6 +5,85 @@ local M = {}
 local backpack_gateway = nil
 local checkin_domain = nil
 
+local function decode_wallet_value(wallet_value)
+    if type(wallet_value) == "table" then
+        return wallet_value
+    end
+    if type(wallet_value) == "string" and wallet_value ~= "" then
+        local ok, decoded = pcall(nk.json_decode, wallet_value)
+        if ok and type(decoded) == "table" then
+            return decoded
+        end
+    end
+    return {}
+end
+
+local function collect_currency_ids(items)
+    local ids = {}
+    if type(items) ~= "table" then
+        return ids
+    end
+    local item_defs = config.items or {}
+    for _, item in ipairs(items) do
+        local item_id = item and item.id
+        if type(item_id) == "string" and item_id ~= "" then
+            local item_def = item_defs[item_id]
+            if type(item_def) == "table" and item_def.type == "currency" then
+                ids[item_id] = true
+            end
+        end
+    end
+    return ids
+end
+
+local function merge_currency_ids(target, source)
+    for item_id, enabled in pairs(source or {}) do
+        if enabled then
+            target[item_id] = true
+        end
+    end
+    return target
+end
+
+local function read_wallet_amounts(user_id, currency_ids)
+    local has_currency = false
+    for _ in pairs(currency_ids or {}) do
+        has_currency = true
+        break
+    end
+    if not has_currency then
+        return {}
+    end
+    local ok, account = pcall(nk.account_get_id, user_id)
+    if not ok or type(account) ~= "table" then
+        return {}
+    end
+    local wallet = decode_wallet_value(account.wallet)
+    local out = {}
+    for item_id, _ in pairs(currency_ids) do
+        out[item_id] = tonumber(wallet[item_id]) or 0
+    end
+    return out
+end
+
+local function build_wallet_changes(currency_ids, before_wallet, after_wallet)
+    local out = {}
+    for item_id, _ in pairs(currency_ids or {}) do
+        local before_count = tonumber(before_wallet and before_wallet[item_id]) or 0
+        local after_count = tonumber(after_wallet and after_wallet[item_id]) or 0
+        table.insert(out, {
+            id = item_id,
+            before = before_count,
+            after = after_count,
+            delta = after_count - before_count
+        })
+    end
+    table.sort(out, function(a, b)
+        return a.id < b.id
+    end)
+    return out
+end
+
 function M.wire_item_gateway(backpack, checkin)
     backpack_gateway = backpack
     checkin_domain = checkin
@@ -40,8 +119,11 @@ function M.rpc_daily_checkin(context, payload)
     if #rewards == 0 then
         return checkin_domain.make_error("CHECKIN_CONFIG_ERROR", "No rewards config for today")
     end
+    local currency_ids = collect_currency_ids(rewards)
+    local wallet_before = read_wallet_amounts(user_id, currency_ids)
 
     local success, err = backpack_gateway.add_items(context, user_id, rewards, "daily_checkin", {
+        requestId = "checkin_daily_grant:" .. tostring(cycle_no) .. ":" .. tostring(current_day_index),
         cycle_no = cycle_no,
         day_index = current_day_index
     })
@@ -53,7 +135,15 @@ function M.rpc_daily_checkin(context, payload)
     state.days[day_str] = { status = "signed", claimAt = claim_at, claimType = "normal" }
     checkin_domain.set_day_claimed(state, current_day_index, "signed", "normal", claim_at)
     checkin_domain.save_state(user_id, state, version)
-    return nk.json_encode({ success = true, rewards = rewards, day_index = current_day_index, status = "signed" })
+    local wallet_after = read_wallet_amounts(user_id, currency_ids)
+    local wallet_changes = build_wallet_changes(currency_ids, wallet_before, wallet_after)
+    return nk.json_encode({
+        success = true,
+        rewards = rewards,
+        day_index = current_day_index,
+        status = "signed",
+        wallet_changes = wallet_changes
+    })
 end
 
 function M.rpc_checkin_makeup(context, payload)
@@ -94,8 +184,11 @@ function M.rpc_checkin_makeup(context, payload)
     if #consume_items == 0 then
         return checkin_domain.make_error("CHECKIN_CONFIG_ERROR", "Invalid makeup cost config")
     end
+    local currency_ids = collect_currency_ids(consume_items)
+    local wallet_before = read_wallet_amounts(user_id, currency_ids)
 
     local success_cost, _ = backpack_gateway.consume_items(context, user_id, consume_items, "checkin_makeup_cost", {
+        requestId = "checkin_makeup_cost:" .. tostring(cycle_no) .. ":" .. tostring(target_day),
         cycle_no = cycle_no,
         target_day = target_day
     })
@@ -105,16 +198,22 @@ function M.rpc_checkin_makeup(context, payload)
 
     local rewards = checkin_domain.normalize_items((checkin_cfg.rewards or {})[target_day])
     if #rewards == 0 then
-        backpack_gateway.add_items(context, user_id, consume_items, "checkin_makeup_refund", {})
+        backpack_gateway.add_items(context, user_id, consume_items, "checkin_makeup_refund", {
+            requestId = "checkin_makeup_refund_no_reward:" .. tostring(cycle_no) .. ":" .. tostring(target_day)
+        })
         return checkin_domain.make_error("CHECKIN_CONFIG_ERROR", "No rewards config")
     end
+    merge_currency_ids(currency_ids, collect_currency_ids(rewards))
 
     local success_grant, err_grant = backpack_gateway.add_items(context, user_id, rewards, "checkin_makeup_reward", {
+        requestId = "checkin_makeup_grant:" .. tostring(cycle_no) .. ":" .. tostring(target_day),
         cycle_no = cycle_no,
         target_day = target_day
     })
     if not success_grant then
-        backpack_gateway.add_items(context, user_id, consume_items, "checkin_makeup_refund", {})
+        backpack_gateway.add_items(context, user_id, consume_items, "checkin_makeup_refund", {
+            requestId = "checkin_makeup_refund_grant_failed:" .. tostring(cycle_no) .. ":" .. tostring(target_day)
+        })
         return checkin_domain.make_error("CHECKIN_GRANT_FAILED", err_grant)
     end
 
@@ -122,7 +221,15 @@ function M.rpc_checkin_makeup(context, payload)
     state.days[day_str] = { status = "makeup_signed", claimAt = claim_at, claimType = "makeup" }
     checkin_domain.set_day_claimed(state, target_day, "makeup_signed", "makeup", claim_at)
     checkin_domain.save_state(user_id, state, version)
-    return nk.json_encode({ success = true, rewards = rewards, day_index = target_day, status = "makeup_signed" })
+    local wallet_after = read_wallet_amounts(user_id, currency_ids)
+    local wallet_changes = build_wallet_changes(currency_ids, wallet_before, wallet_after)
+    return nk.json_encode({
+        success = true,
+        rewards = rewards,
+        day_index = target_day,
+        status = "makeup_signed",
+        wallet_changes = wallet_changes
+    })
 end
 
 function M.rpc_debug_set_time_offset(context, payload)
