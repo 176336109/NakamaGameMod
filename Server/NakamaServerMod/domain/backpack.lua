@@ -77,6 +77,30 @@ local function resolve_item_id(item_id)
     return normalized
 end
 
+local function decode_wallet_value(wallet_value)
+    if type(wallet_value) == "table" then
+        return wallet_value
+    end
+    if type(wallet_value) == "string" and wallet_value ~= "" then
+        local ok, decoded = pcall(nk.json_decode, wallet_value)
+        if ok and type(decoded) == "table" then
+            return decoded
+        end
+    end
+    return {}
+end
+
+local function apply_wallet_update(user_id, wallet_changes, source, strict)
+    local ok, updated, extra = pcall(nk.wallet_update, user_id, wallet_changes, { source = source }, strict)
+    if not ok then
+        return false, tostring(updated)
+    end
+    if updated == nil then
+        return false, tostring(extra or "WALLET_UPDATE_FAILED")
+    end
+    return true, updated
+end
+
 local function is_effective(expire_at, now)
     if expire_at == nil then
         return true
@@ -546,7 +570,7 @@ function M.add_items(context, user_id, items_to_add, log_source, log_ref)
     end
     local wallet_applied = false
     if next(wallet_changes) ~= nil then
-        local ok_wallet, err_wallet = pcall(nk.wallet_update, user_id, wallet_changes, { source = log_source or "grant" }, true)
+        local ok_wallet, err_wallet = apply_wallet_update(user_id, wallet_changes, log_source or "grant", true)
         if not ok_wallet then
             return false, tostring(err_wallet)
         end
@@ -560,7 +584,7 @@ function M.add_items(context, user_id, items_to_add, log_source, log_ref)
             for k, v in pairs(wallet_changes) do
                 rollback[k] = -v
             end
-            pcall(nk.wallet_update, user_id, rollback, { source = (log_source or "grant") .. "_rollback" }, false)
+            pcall(apply_wallet_update, user_id, rollback, (log_source or "grant") .. "_rollback", false)
         end
         return false, write_err
     end
@@ -645,7 +669,7 @@ function M.consume_items(context, user_id, items_to_consume, log_source, log_ref
 
     local wallet_applied = false
     if next(wallet_changes) ~= nil then
-        local ok_wallet, err_wallet = pcall(nk.wallet_update, user_id, wallet_changes, { source = log_source or "consume" }, true)
+        local ok_wallet, err_wallet = apply_wallet_update(user_id, wallet_changes, log_source or "consume", true)
         if not ok_wallet then
             return false, "INSUFFICIENT_CURRENCY:" .. tostring(err_wallet)
         end
@@ -659,7 +683,7 @@ function M.consume_items(context, user_id, items_to_consume, log_source, log_ref
             for k, v in pairs(wallet_changes) do
                 rollback[k] = -v
             end
-            pcall(nk.wallet_update, user_id, rollback, { source = (log_source or "consume") .. "_rollback" }, false)
+            pcall(apply_wallet_update, user_id, rollback, (log_source or "consume") .. "_rollback", false)
         end
         return false, write_err
     end
@@ -716,11 +740,7 @@ function M.rpc_wallet_get(context, payload)
     if not ok or account == nil then
         return nk.json_encode({ success = false, error = { code = "ACCOUNT_NOT_FOUND", message = "Account not found" } })
     end
-    local wallet = account.wallet or {}
-    if type(wallet) == "string" then
-        local decode_ok, decoded = pcall(nk.json_decode, wallet)
-        wallet = decode_ok and decoded or {}
-    end
+    local wallet = decode_wallet_value(account.wallet or {})
     return nk.json_encode({ success = true, wallet = wallet })
 end
 
