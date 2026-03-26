@@ -115,7 +115,8 @@ function M.rpc_daily_checkin(context, payload)
     end
 
     local checkin_cfg = config.checkin or {}
-    local rewards = checkin_domain.normalize_items((checkin_cfg.rewards or {})[current_day_index])
+    local rewards_cfg = checkin_cfg.rewards or {}
+    local rewards = checkin_domain.normalize_items(rewards_cfg[current_day_index] or rewards_cfg[tostring(current_day_index)])
     if #rewards == 0 then
         return checkin_domain.make_error("CHECKIN_CONFIG_ERROR", "No rewards config for today")
     end
@@ -123,7 +124,6 @@ function M.rpc_daily_checkin(context, payload)
     local wallet_before = read_wallet_amounts(user_id, currency_ids)
 
     local success, err = backpack_gateway.add_items(context, user_id, rewards, "daily_checkin", {
-        requestId = "checkin_daily_grant:" .. tostring(cycle_no) .. ":" .. tostring(current_day_index),
         cycle_no = cycle_no,
         day_index = current_day_index
     })
@@ -152,7 +152,7 @@ function M.rpc_checkin_makeup(context, payload)
     end
     local user_id = context.user_id
     local req = nk.json_decode(payload)
-    local target_day = req.day_index
+    local target_day = tonumber(req.day_index)
 
     if not target_day or target_day < 1 or target_day > 7 then
         return checkin_domain.make_error("CHECKIN_INVALID_PARAM", "Invalid day index")
@@ -188,7 +188,6 @@ function M.rpc_checkin_makeup(context, payload)
     local wallet_before = read_wallet_amounts(user_id, currency_ids)
 
     local success_cost, _ = backpack_gateway.consume_items(context, user_id, consume_items, "checkin_makeup_cost", {
-        requestId = "checkin_makeup_cost:" .. tostring(cycle_no) .. ":" .. tostring(target_day),
         cycle_no = cycle_no,
         target_day = target_day
     })
@@ -196,24 +195,20 @@ function M.rpc_checkin_makeup(context, payload)
         return checkin_domain.make_error("CHECKIN_INSUFFICIENT_COST", "Insufficient crystals")
     end
 
-    local rewards = checkin_domain.normalize_items((checkin_cfg.rewards or {})[target_day])
+    local rewards_cfg = checkin_cfg.rewards or {}
+    local rewards = checkin_domain.normalize_items(rewards_cfg[target_day] or rewards_cfg[tostring(target_day)])
     if #rewards == 0 then
-        backpack_gateway.add_items(context, user_id, consume_items, "checkin_makeup_refund", {
-            requestId = "checkin_makeup_refund_no_reward:" .. tostring(cycle_no) .. ":" .. tostring(target_day)
-        })
+        backpack_gateway.add_items(context, user_id, consume_items, "checkin_makeup_refund", {})
         return checkin_domain.make_error("CHECKIN_CONFIG_ERROR", "No rewards config")
     end
     merge_currency_ids(currency_ids, collect_currency_ids(rewards))
 
     local success_grant, err_grant = backpack_gateway.add_items(context, user_id, rewards, "checkin_makeup_reward", {
-        requestId = "checkin_makeup_grant:" .. tostring(cycle_no) .. ":" .. tostring(target_day),
         cycle_no = cycle_no,
         target_day = target_day
     })
     if not success_grant then
-        backpack_gateway.add_items(context, user_id, consume_items, "checkin_makeup_refund", {
-            requestId = "checkin_makeup_refund_grant_failed:" .. tostring(cycle_no) .. ":" .. tostring(target_day)
-        })
+        backpack_gateway.add_items(context, user_id, consume_items, "checkin_makeup_refund", {})
         return checkin_domain.make_error("CHECKIN_GRANT_FAILED", err_grant)
     end
 
