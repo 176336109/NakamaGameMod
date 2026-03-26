@@ -25,7 +25,6 @@ local config = require("config")
 local M = {}
 
 local BACKPACK_COLLECTION = "backpack"
-local IDEMP_COLLECTION = "backpack_idempotency"
 local NORMAL_ITEM_KEY = "normalItem"
 local VIP_ITEM_ID = "item_vip_active"
 local SVIP_ITEM_ID = "item_svip_active"
@@ -91,14 +90,11 @@ local function decode_wallet_value(wallet_value)
 end
 
 local function apply_wallet_update(user_id, wallet_changes, source, strict)
-    local ok, updated, extra = pcall(nk.wallet_update, user_id, wallet_changes, { source = source }, strict)
+    local ok, updated = pcall(nk.wallet_update, user_id, wallet_changes, { source = source }, strict)
     if not ok then
         return false, tostring(updated)
     end
-    if updated == nil then
-        return false, tostring(extra or "WALLET_UPDATE_FAILED")
-    end
-    return true, updated
+    return true, updated or {}
 end
 
 local function is_effective(expire_at, now)
@@ -344,59 +340,6 @@ local function write_change_record(context, user_id, change_type, source, reques
     -- 取消 bag_change_record 的写入
 end
 
-local function extract_request_id(context, ref)
-    if type(ref) == "table" then
-        if type(ref.requestId) == "string" and ref.requestId ~= "" then
-            return ref.requestId
-        end
-        if type(ref.request_id) == "string" and ref.request_id ~= "" then
-            return ref.request_id
-        end
-    end
-    if type(context) == "table" and type(context.request_id) == "string" and context.request_id ~= "" then
-        return context.request_id
-    end
-    return nil
-end
-
-local function check_idempotent(user_id, request_id, op_type)
-    if request_id == nil then
-        return false, nil
-    end
-    local objects = nk.storage_read({
-        {
-            collection = IDEMP_COLLECTION,
-            key = request_id,
-            user_id = user_id
-        }
-    })
-    local obj = objects[1]
-    if obj and type(obj.value) == "table" and obj.value.opType == op_type then
-        return true, obj.value.result
-    end
-    return false, nil
-end
-
-local function save_idempotent(user_id, request_id, op_type, result)
-    if request_id == nil then
-        return
-    end
-    pcall(nk.storage_write, {
-        {
-            collection = IDEMP_COLLECTION,
-            key = request_id,
-            user_id = user_id,
-            value = {
-                opType = op_type,
-                result = result or { success = true },
-                savedAt = now_ts()
-            },
-            permission_read = 0,
-            permission_write = 0
-        }
-    })
-end
-
 local function normalize_items(raw_items)
     if type(raw_items) ~= "table" then
         return nil, "INVALID_ITEMS"
@@ -457,13 +400,6 @@ function M.add_items(context, user_id, items_to_add, log_source, log_ref)
     local items, err = normalize_items(items_to_add or {})
     if not items then
         return false, err
-    end
-    local request_id = extract_request_id(context, log_ref)
-    local idempotent_hit, cached = check_idempotent(user_id, request_id, "grant")
-    if idempotent_hit then
-        local result = cached or { success = true }
-        result.idempotent = true
-        return true, result
     end
     local ok, snapshot = load_snapshot(user_id)
     if not ok then
@@ -589,22 +525,13 @@ function M.add_items(context, user_id, items_to_add, log_source, log_ref)
         return false, write_err
     end
 
-    local result = { success = true, requestId = request_id, idempotent = false }
-    save_idempotent(user_id, request_id, "grant", result)
-    return true, result
+    return true, { success = true }
 end
 
 function M.consume_items(context, user_id, items_to_consume, log_source, log_ref)
     local items, err = normalize_items(items_to_consume or {})
     if not items then
         return false, err
-    end
-    local request_id = extract_request_id(context, log_ref)
-    local idempotent_hit, cached = check_idempotent(user_id, request_id, "consume")
-    if idempotent_hit then
-        local result = cached or { success = true }
-        result.idempotent = true
-        return true, result
     end
     local ok, snapshot = load_snapshot(user_id)
     if not ok then
@@ -688,9 +615,7 @@ function M.consume_items(context, user_id, items_to_consume, log_source, log_ref
         return false, write_err
     end
 
-    local result = { success = true, requestId = request_id, idempotent = false }
-    save_idempotent(user_id, request_id, "consume", result)
-    return true, result
+    return true, { success = true }
 end
 
 function M.cleanup_expired_items(context, user_id, source, ref)
@@ -979,11 +904,7 @@ function M.rpc_backpack_grant(context, payload)
     end
     local items = req.items or {}
     local source = req.source or "rpc_backpack_grant"
-    local ref = req.ref or {}
-    if req.requestId ~= nil and ref.requestId == nil then
-        ref.requestId = req.requestId
-    end
-    local ok, result_or_err = M.add_items(context, context.user_id, items, source, ref)
+    local ok, result_or_err = M.add_items(context, context.user_id, items, source, req.ref or {})
     if not ok then
         return nk.json_encode({ success = false, error = { code = "GRANT_FAILED", message = tostring(result_or_err) } })
     end
@@ -997,11 +918,7 @@ function M.rpc_backpack_consume(context, payload)
     end
     local items = req.items or {}
     local source = req.source or "rpc_backpack_consume"
-    local ref = req.ref or {}
-    if req.requestId ~= nil and ref.requestId == nil then
-        ref.requestId = req.requestId
-    end
-    local ok, result_or_err = M.consume_items(context, context.user_id, items, source, ref)
+    local ok, result_or_err = M.consume_items(context, context.user_id, items, source, req.ref or {})
     if not ok then
         return nk.json_encode({ success = false, error = { code = "CONSUME_FAILED", message = tostring(result_or_err) } })
     end

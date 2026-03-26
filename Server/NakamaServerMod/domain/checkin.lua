@@ -216,7 +216,7 @@ function M.get_state_data(user_id)
                 status = "locked"
             end
         end
-        local rewards = normalize_items(rewards_cfg[i] or {})
+        local rewards = normalize_items(rewards_cfg[i] or rewards_cfg[tostring(i)] or {})
         day_rewards[i] = rewards
         table.insert(days_info, { day_index = i, status = status, rewards = rewards })
     end

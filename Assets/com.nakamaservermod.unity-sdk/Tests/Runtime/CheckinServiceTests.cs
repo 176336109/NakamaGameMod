@@ -449,7 +449,7 @@ namespace NakamaServerMod.UnitySdk.Tests
 
             // 检查结果：应该只有1次成功，水晶只扣1次 (20)
             var state = await service.GetStateAsync();
-            Assert.AreEqual("signed", state.days[0].status);
+            Assert.AreEqual("makeup_signed", state.days[0].status);
             
             // 检查水晶余额 (需额外RPC支持查询余额，或者通过日志推断)
             // 这里我们假设如果状态正确且未报错，则服务端处理了并发
@@ -511,7 +511,7 @@ namespace NakamaServerMod.UnitySdk.Tests
             }
 
             var state = await service.GetStateAsync();
-            Assert.AreEqual("signed", state.days[0].status);
+            Assert.AreEqual("makeup_signed", state.days[0].status);
 
             // --- Final Result Verification ---
             // 预期结果：并发补签只能成功一次
@@ -619,9 +619,21 @@ namespace NakamaServerMod.UnitySdk.Tests
             // Day 2, 3, 4, 5 missed. Day 6 claimable.
             
             // 补签 Day 2, 3, 4
-            await service.MakeupAsync(2);
-            await service.MakeupAsync(3);
-            await service.MakeupAsync(4);
+            var makeupDay2 = await service.MakeupAsync(2);
+            Assert.IsTrue(makeupDay2.success);
+            Assert.AreEqual(2, makeupDay2.day_index);
+            Assert.AreEqual("gem", makeupDay2.rewards[0].id);
+            Assert.AreEqual(50, makeupDay2.rewards[0].count);
+            var makeupDay3 = await service.MakeupAsync(3);
+            Assert.IsTrue(makeupDay3.success);
+            Assert.AreEqual(3, makeupDay3.day_index);
+            Assert.AreEqual("010300001", makeupDay3.rewards[0].id);
+            Assert.AreEqual(1, makeupDay3.rewards[0].count);
+            var makeupDay4 = await service.MakeupAsync(4);
+            Assert.IsTrue(makeupDay4.success);
+            Assert.AreEqual(4, makeupDay4.day_index);
+            Assert.AreEqual("020100001", makeupDay4.rewards[0].id);
+            Assert.AreEqual(5, makeupDay4.rewards[0].count);
 
             var state = await service.GetStateAsync();
             Assert.AreEqual("makeup_signed", state.days[1].status);
