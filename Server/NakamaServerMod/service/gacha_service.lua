@@ -5,6 +5,7 @@ local response = require("service.response")
 local M = {}
 local gacha_domain = nil
 
+-- 注入背包网关并完成 gacha domain 依赖装配。
 function M.wire_item_gateway(backpack, gacha)
     gacha_domain = gacha
     if gacha_domain and type(gacha_domain.set_item_gateway) == "function" then
@@ -12,6 +13,7 @@ function M.wire_item_gateway(backpack, gacha)
     end
 end
 
+-- 抽卡 RPC 入口：负责调用 domain、归一错误并输出统一响应结构。
 function M.rpc_gacha_pull(context, payload)
     if not gacha_domain or type(gacha_domain.rpc_gacha_pull) ~= "function" then
         local code, message = error_codes.resolve("GACHA_SERVICE_NOT_WIRED", "Gacha service not wired")

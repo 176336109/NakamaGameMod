@@ -8,20 +8,24 @@ local backpack_gateway = nil
 local shop_domain = nil
 local iap_service = nil
 
+-- 按错误码键统一构造失败响应。
 local function fail_by_key(key, fallback_message)
     local code, message = error_codes.resolve(key, fallback_message)
     return response.fail(code, message)
 end
 
+-- 注入背包与商店领域依赖。
 function M.wire_item_gateway(backpack, shop)
     backpack_gateway = backpack
     shop_domain = shop
 end
 
+-- 注入 IAP service，处理 RMB 商品下单。
 function M.set_iap_service(service)
     iap_service = service
 end
 
+-- 统一处理支付：RMB 走 IAP，下游货币走背包扣费。
 local function handle_payment(context, user_id, goods_id, cost_type, cost_value, req)
     if cost_type == "rmb" then
         if not iap_service or type(iap_service.rpc_create_order) ~= "function" then
@@ -59,6 +63,7 @@ local function handle_payment(context, user_id, goods_id, cost_type, cost_value,
     return true, nil
 end
 
+-- 获取商店快照与各类商品进度。
 function M.rpc_shop_get_state(context, payload)
     if not shop_domain or type(shop_domain.get_state_data) ~= "function" then
         return fail_by_key("SHOP_SERVICE_NOT_WIRED", "Shop service not wired")
@@ -67,6 +72,7 @@ function M.rpc_shop_get_state(context, payload)
     return response.ok(state_data)
 end
 
+-- 刷新特惠商店随机快照并扣除刷新成本。
 function M.rpc_shop_refresh(context, payload)
     if not backpack_gateway or not shop_domain then
         return fail_by_key("SHOP_SERVICE_NOT_WIRED", "Shop service not wired")
@@ -84,6 +90,7 @@ function M.rpc_shop_refresh(context, payload)
     return response.ok({ snapshot = snapshot })
 end
 
+-- 商品购买入口：校验限购、扣费、发奖并写回进度。
 function M.rpc_shop_buy(context, payload)
     if not backpack_gateway or not shop_domain then
         return fail_by_key("SHOP_SERVICE_NOT_WIRED", "Shop service not wired")

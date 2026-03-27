@@ -29,6 +29,7 @@ local NORMAL_ITEM_KEY = "normalItem"
 local VIP_ITEM_ID = "item_vip_active"
 local SVIP_ITEM_ID = "item_svip_active"
 
+-- 生成安全唯一ID，优先使用 nk.uuid_v4，失败时退回随机串。
 local function safe_uuid()
     if nk.uuid_v4 ~= nil then
         local ok, value = pcall(nk.uuid_v4)
@@ -39,6 +40,7 @@ local function safe_uuid()
     return tostring(math.random(1000000000, 2147483647)) .. tostring(math.random(1000000000, 2147483647))
 end
 
+-- 安全数值转换，失败返回默认值。
 local function to_number(v, default_value)
     local n = tonumber(v)
     if n == nil then
@@ -47,10 +49,12 @@ local function to_number(v, default_value)
     return n
 end
 
+-- 当前秒级时间戳。
 local function now_ts()
     return os.time()
 end
 
+-- 解析 RPC 入参 JSON。
 local function decode_payload(payload)
     if payload == nil or payload == "" then
         return true, {}
@@ -65,6 +69,7 @@ local function decode_payload(payload)
     return true, value
 end
 
+-- 统一道具 ID 规范化。
 local function resolve_item_id(item_id)
     if item_id == nil then
         return nil
@@ -76,6 +81,7 @@ local function resolve_item_id(item_id)
     return normalized
 end
 
+-- 解析钱包字段为 table。
 local function decode_wallet_value(wallet_value)
     if type(wallet_value) == "table" then
         return wallet_value
@@ -89,6 +95,7 @@ local function decode_wallet_value(wallet_value)
     return {}
 end
 
+-- 执行钱包原子更新（可启用余额检查）。
 local function apply_wallet_update(user_id, wallet_changes, source, strict)
     local ok, updated = pcall(nk.wallet_update, user_id, wallet_changes, { source = source }, strict)
     if not ok then
@@ -97,6 +104,7 @@ local function apply_wallet_update(user_id, wallet_changes, source, strict)
     return true, updated or {}
 end
 
+-- 判断过期时间是否仍生效。
 local function is_effective(expire_at, now)
     if expire_at == nil then
         return true
@@ -104,6 +112,7 @@ local function is_effective(expire_at, now)
     return expire_at > now
 end
 
+-- 读取背包槽位上限配置。
 local function get_slot_capacity()
     local backpack_cfg = config.backpack or {}
     local slot_capacity = to_number(backpack_cfg.slotCapacity, nil)
@@ -116,6 +125,7 @@ local function get_slot_capacity()
     return math.floor(slot_capacity)
 end
 
+-- 读取并组装道具配置元信息。
 local function get_item_config(item_id)
     local item_def = config.items and config.items[item_id]
     if not item_def then
@@ -143,6 +153,7 @@ local function get_item_config(item_id)
     }
 end
 
+-- 生成对外返回的道具定义结构。
 local function build_item_definition(item_id)
     local item_cfg = get_item_config(item_id)
     if not item_cfg then
@@ -160,6 +171,7 @@ local function build_item_definition(item_id)
     }
 end
 
+-- 分页拉取用户某集合全部对象。
 local function list_all_objects(user_id, collection)
     local all = {}
     local cursor = nil
@@ -187,6 +199,7 @@ local function list_all_objects(user_id, collection)
     return true, all
 end
 
+-- 加载用户背包快照（key->object 映射）。
 local function load_snapshot(user_id)
     local ok, objects_or_err = list_all_objects(user_id, BACKPACK_COLLECTION)
     if not ok then
@@ -203,10 +216,12 @@ local function load_snapshot(user_id)
     return true, by_key
 end
 
+-- 判断是否为可堆叠记录。
 local function is_stack_record(value)
     return type(value) == "table" and value.recordType == "stack"
 end
 
+-- 获取 normalItem 聚合对象，不存在则创建。
 local function get_normal_item_object(snapshot)
     local obj = snapshot[NORMAL_ITEM_KEY]
     if not obj then
@@ -223,6 +238,7 @@ local function get_normal_item_object(snapshot)
     return obj
 end
 
+-- 判断是否为实例型记录（VIP/SVIP 或 instance:*）。
 local function is_instance_record(key, value)
     if type(value) ~= "table" then
         return false
@@ -236,6 +252,7 @@ local function is_instance_record(key, value)
     return false
 end
 
+-- 重算当前已占用槽位数。
 local function recalc_used_slots(snapshot, now)
     local used = 0
     for key, obj in pairs(snapshot) do
@@ -267,6 +284,7 @@ local function recalc_used_slots(snapshot, now)
     return used
 end
 
+-- 清理快照中过期或无效记录。
 local function cleanup_expired(snapshot, now, touched)
     for key, obj in pairs(snapshot) do
         local value = obj.value or {}
@@ -310,6 +328,7 @@ local function cleanup_expired(snapshot, now, touched)
     end
 end
 
+-- 把 touched 标记的对象批量写回 storage。
 local function write_objects(user_id, snapshot, touched)
     local writes = {}
     for key, _ in pairs(touched) do
@@ -336,10 +355,12 @@ local function write_objects(user_id, snapshot, touched)
     return true
 end
 
+-- 预留：背包变更流水写入（当前关闭）。
 local function write_change_record(context, user_id, change_type, source, request_id, item_changes, ref)
     -- 取消 bag_change_record 的写入
 end
 
+-- 归一化输入道具数组并校验合法性。
 local function normalize_items(raw_items)
     if type(raw_items) ~= "table" then
         return nil, "INVALID_ITEMS"
@@ -365,6 +386,7 @@ local function normalize_items(raw_items)
     return out, nil
 end
 
+-- 聚合快照中当前有效道具数量。
 local function aggregate_inventory(snapshot, now)
     local counts = {}
     for key, obj in pairs(snapshot) do
@@ -396,6 +418,7 @@ local function aggregate_inventory(snapshot, now)
     return counts
 end
 
+-- 发放道具主流程：校验、占槽检查、钱包更新、落盘回滚。
 function M.add_items(context, user_id, items_to_add, log_source, log_ref)
     local items, err = normalize_items(items_to_add or {})
     if not items then
@@ -528,6 +551,7 @@ function M.add_items(context, user_id, items_to_add, log_source, log_ref)
     return true, { success = true }
 end
 
+-- 消耗道具主流程：校验、扣减、钱包更新、落盘回滚。
 function M.consume_items(context, user_id, items_to_consume, log_source, log_ref)
     local items, err = normalize_items(items_to_consume or {})
     if not items then
@@ -618,6 +642,7 @@ function M.consume_items(context, user_id, items_to_consume, log_source, log_ref
     return true, { success = true }
 end
 
+-- 清理过期道具并持久化。
 function M.cleanup_expired_items(context, user_id, source, ref)
     local ok, snapshot = load_snapshot(user_id)
     if not ok then
@@ -633,6 +658,7 @@ function M.cleanup_expired_items(context, user_id, source, ref)
     return true, { success = true, cleaned = true }
 end
 
+-- 判断单个道具数据是否已过期。
 function M.is_item_expired(item_data)
     if not item_data then
         return true
@@ -644,6 +670,7 @@ function M.is_item_expired(item_data)
     return expire_at <= now_ts()
 end
 
+-- 计算单个时效道具剩余天数。
 function M.get_remaining_days(item_data)
     if not item_data or M.is_item_expired(item_data) then
         return 0
@@ -659,6 +686,7 @@ function M.get_remaining_days(item_data)
     return math.ceil(remain / 86400)
 end
 
+-- RPC：查询钱包余额。
 function M.rpc_wallet_get(context, payload)
     local user_id = context.user_id
     local ok, account = pcall(nk.account_get_id, user_id)
@@ -669,6 +697,7 @@ function M.rpc_wallet_get(context, payload)
     return nk.json_encode({ success = true, wallet = wallet })
 end
 
+-- RPC：查询指定道具数量（或全部）。
 function M.rpc_inventory_get_items(context, payload)
     local ok_decode, req = decode_payload(payload)
     if not ok_decode then
@@ -704,6 +733,7 @@ function M.rpc_inventory_get_items(context, payload)
     })
 end
 
+-- 规范化 item_type 过滤参数。
 local function normalize_item_type_filter(v)
     if v == nil then
         return nil
@@ -719,6 +749,7 @@ local function normalize_item_type_filter(v)
     return s
 end
 
+-- 判断道具类型是否匹配过滤条件。
 local function item_type_matches(filter_type, item_type)
     if filter_type == nil then
         return true
@@ -726,6 +757,7 @@ local function item_type_matches(filter_type, item_type)
     return item_type == filter_type
 end
 
+-- 获取道具展示元数据（类型/名称/描述）。
 local function get_item_meta(item_id, fallback_type)
     local item_cfg = get_item_config(item_id)
     local item_type = fallback_type
@@ -739,6 +771,7 @@ local function get_item_meta(item_id, fallback_type)
     return item_type, item_name, item_desc
 end
 
+-- 收集背包列表分页结果。
 local function collect_backpack_items(snapshot, now, limit, item_type_filter)
     local items = {}
     for key, obj in pairs(snapshot) do
@@ -814,6 +847,7 @@ local function collect_backpack_items(snapshot, now, limit, item_type_filter)
     return out
 end
 
+-- RPC：分页列出背包。
 function M.rpc_inventory_list(context, payload)
     local ok_decode, req = decode_payload(payload)
     if not ok_decode then
@@ -841,10 +875,12 @@ function M.rpc_inventory_list(context, payload)
     })
 end
 
+-- RPC：查询背包流水（当前返回空列表）。
 function M.rpc_inventory_log_list(context, payload)
     return nk.json_encode({ success = true, logs = {}, cursor = nil })
 end
 
+-- RPC：查询全部道具定义。
 function M.rpc_inventory_get_item_defs(context, payload)
     local out = {}
     local item_defs = config.items or {}
@@ -859,6 +895,7 @@ function M.rpc_inventory_get_item_defs(context, payload)
     return nk.json_encode({ success = true, items = out })
 end
 
+-- RPC：聚合返回定义+背包列表。
 function M.rpc_inventory_get_all_info(context, payload)
     local ok_decode, req = decode_payload(payload)
     if not ok_decode then
@@ -897,6 +934,7 @@ function M.rpc_inventory_get_all_info(context, payload)
     })
 end
 
+-- RPC：发放道具。
 function M.rpc_backpack_grant(context, payload)
     local ok_decode, req = decode_payload(payload)
     if not ok_decode then
@@ -911,6 +949,7 @@ function M.rpc_backpack_grant(context, payload)
     return nk.json_encode({ success = true, result = result_or_err })
 end
 
+-- RPC：消耗道具。
 function M.rpc_backpack_consume(context, payload)
     local ok_decode, req = decode_payload(payload)
     if not ok_decode then
@@ -925,10 +964,12 @@ function M.rpc_backpack_consume(context, payload)
     return nk.json_encode({ success = true, result = result_or_err })
 end
 
+-- RPC：使用道具（复用 consume）。
 function M.rpc_backpack_use(context, payload)
     return M.rpc_backpack_consume(context, payload)
 end
 
+-- RPC：清理过期道具。
 function M.rpc_backpack_cleanup(context, payload)
     local ok, result_or_err = M.cleanup_expired_items(context, context.user_id, "rpc_backpack_cleanup", {})
     if not ok then
@@ -937,6 +978,7 @@ function M.rpc_backpack_cleanup(context, payload)
     return nk.json_encode({ success = true, result = result_or_err })
 end
 
+-- RPC：背包状态聚合（旧接口占位）。
 function M.rpc_backpack_get_state(context, payload)
     return nk.json_encode({
         success = true,

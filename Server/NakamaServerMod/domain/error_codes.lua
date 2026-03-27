@@ -1,5 +1,6 @@
 local M = {}
 
+-- 统一错误码字典：键为业务语义，值为数值码与默认文案。
 local ERROR_MAP = {
     COMMON_INTERNAL_ERROR = { code = 10000001, message = "内部服务异常" },
     COMMON_INVALID_PARAM = { code = 10000001, message = "参数非法" },
@@ -54,10 +55,12 @@ local ERROR_MAP = {
     VIP_INVALID_PLAN_ID = { code = 900007, message = "调试购买参数非法" }
 }
 
+-- 获取指定错误键的原始映射项。
 function M.get(key)
     return ERROR_MAP[key]
 end
 
+-- 解析错误键为（数值码, 文案）；可用 fallback 覆盖默认文案。
 function M.resolve(key, fallback_message)
     local item = ERROR_MAP[key] or ERROR_MAP.COMMON_INTERNAL_ERROR
     local message = fallback_message

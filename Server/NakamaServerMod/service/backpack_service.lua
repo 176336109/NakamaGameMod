@@ -6,19 +6,23 @@ local M = {}
 local backpack_domain = nil
 local IDEMP_COLLECTION = "backpack_idempotency"
 
+-- 注入背包领域依赖。
 function M.wire(backpack)
     backpack_domain = backpack
 end
 
+-- 按错误码键统一构造失败响应。
 local function fail_by_key(key, fallback_message)
     local code, message = error_codes.resolve(key, fallback_message)
     return response.fail(code, message)
 end
 
+-- 判断服务是否已完成依赖装配。
 local function service_ready()
     return backpack_domain ~= nil
 end
 
+-- 把背包旧错误码/文本映射到统一错误码。
 local function map_backpack_error(legacy_code, legacy_message)
     if legacy_code == "INVALID_PAYLOAD" then
         return "BACKPACK_INVALID_PARAM"
@@ -59,6 +63,7 @@ local function map_backpack_error(legacy_code, legacy_message)
     return "COMMON_INTERNAL_ERROR"
 end
 
+-- 归一化 domain 响应为统一 success/error 结构。
 local function normalize_domain_response(raw)
     local ok, data = pcall(nk.json_decode, raw or "")
     if not ok or type(data) ~= "table" then
@@ -80,11 +85,13 @@ local function normalize_domain_response(raw)
     return response.ok(data)
 end
 
+-- 透传调用 domain RPC 并进行统一封装。
 local function forward_rpc(handler, context, payload)
     local raw = handler(context, payload)
     return normalize_domain_response(raw)
 end
 
+-- 读取某次幂等请求的回放结果。
 local function read_idempotent_result(user_id, operation, request_id)
     local ok, records = pcall(nk.storage_read, {
         {
@@ -106,6 +113,7 @@ local function read_idempotent_result(user_id, operation, request_id)
     return value.result
 end
 
+-- 写入幂等请求结果，用于重复请求直接回放。
 local function write_idempotent_result(user_id, operation, request_id, result)
     pcall(nk.storage_write, {
         {
@@ -121,6 +129,7 @@ local function write_idempotent_result(user_id, operation, request_id, result)
     })
 end
 
+-- 处理带 requestId 的变更请求幂等逻辑。
 local function handle_mutation_with_idempotency(operation, handler, context, payload)
     local request_id = nil
     local ok_req, req = pcall(nk.json_decode, payload or "")
@@ -152,6 +161,7 @@ local function handle_mutation_with_idempotency(operation, handler, context, pay
     return nk.json_encode(data)
 end
 
+-- 调试入口：直接为用户追加道具。
 function M.rpc_debug_add_items(context, payload)
     if not service_ready() then
         return fail_by_key("BACKPACK_SERVICE_NOT_WIRED", "Backpack service not wired")
@@ -170,6 +180,7 @@ function M.rpc_debug_add_items(context, payload)
     return response.ok({ result = result_or_err })
 end
 
+-- 查询钱包余额。
 function M.rpc_wallet_get(context, payload)
     if not service_ready() then
         return fail_by_key("BACKPACK_SERVICE_NOT_WIRED", "Backpack service not wired")
@@ -177,6 +188,7 @@ function M.rpc_wallet_get(context, payload)
     return forward_rpc(backpack_domain.rpc_wallet_get, context, payload)
 end
 
+-- 查询指定道具明细。
 function M.rpc_inventory_get_items(context, payload)
     if not service_ready() then
         return fail_by_key("BACKPACK_SERVICE_NOT_WIRED", "Backpack service not wired")
@@ -184,6 +196,7 @@ function M.rpc_inventory_get_items(context, payload)
     return forward_rpc(backpack_domain.rpc_inventory_get_items, context, payload)
 end
 
+-- 分页查询背包列表。
 function M.rpc_inventory_list(context, payload)
     if not service_ready() then
         return fail_by_key("BACKPACK_SERVICE_NOT_WIRED", "Backpack service not wired")
@@ -191,6 +204,7 @@ function M.rpc_inventory_list(context, payload)
     return forward_rpc(backpack_domain.rpc_inventory_list, context, payload)
 end
 
+-- 查询道具定义。
 function M.rpc_inventory_get_item_defs(context, payload)
     if not service_ready() then
         return fail_by_key("BACKPACK_SERVICE_NOT_WIRED", "Backpack service not wired")
@@ -198,6 +212,7 @@ function M.rpc_inventory_get_item_defs(context, payload)
     return forward_rpc(backpack_domain.rpc_inventory_get_item_defs, context, payload)
 end
 
+-- 一次性查询定义、背包、日志等聚合信息。
 function M.rpc_inventory_get_all_info(context, payload)
     if not service_ready() then
         return fail_by_key("BACKPACK_SERVICE_NOT_WIRED", "Backpack service not wired")
@@ -205,6 +220,7 @@ function M.rpc_inventory_get_all_info(context, payload)
     return forward_rpc(backpack_domain.rpc_inventory_get_all_info, context, payload)
 end
 
+-- 分页查询背包变更日志。
 function M.rpc_inventory_log_list(context, payload)
     if not service_ready() then
         return fail_by_key("BACKPACK_SERVICE_NOT_WIRED", "Backpack service not wired")
@@ -212,6 +228,7 @@ function M.rpc_inventory_log_list(context, payload)
     return forward_rpc(backpack_domain.rpc_inventory_log_list, context, payload)
 end
 
+-- 发放道具（带 requestId 幂等支持）。
 function M.rpc_backpack_grant(context, payload)
     if not service_ready() then
         return fail_by_key("BACKPACK_SERVICE_NOT_WIRED", "Backpack service not wired")
@@ -219,6 +236,7 @@ function M.rpc_backpack_grant(context, payload)
     return handle_mutation_with_idempotency("grant", backpack_domain.rpc_backpack_grant, context, payload)
 end
 
+-- 消耗道具（带 requestId 幂等支持）。
 function M.rpc_backpack_consume(context, payload)
     if not service_ready() then
         return fail_by_key("BACKPACK_SERVICE_NOT_WIRED", "Backpack service not wired")
@@ -226,6 +244,7 @@ function M.rpc_backpack_consume(context, payload)
     return handle_mutation_with_idempotency("consume", backpack_domain.rpc_backpack_consume, context, payload)
 end
 
+-- 使用道具（带 requestId 幂等支持）。
 function M.rpc_backpack_use(context, payload)
     if not service_ready() then
         return fail_by_key("BACKPACK_SERVICE_NOT_WIRED", "Backpack service not wired")
@@ -233,6 +252,7 @@ function M.rpc_backpack_use(context, payload)
     return handle_mutation_with_idempotency("use", backpack_domain.rpc_backpack_use, context, payload)
 end
 
+-- 清理过期道具。
 function M.rpc_backpack_cleanup(context, payload)
     if not service_ready() then
         return fail_by_key("BACKPACK_SERVICE_NOT_WIRED", "Backpack service not wired")
@@ -240,6 +260,7 @@ function M.rpc_backpack_cleanup(context, payload)
     return forward_rpc(backpack_domain.rpc_backpack_cleanup, context, payload)
 end
 
+-- 获取背包聚合状态。
 function M.rpc_backpack_get_state(context, payload)
     if not service_ready() then
         return fail_by_key("BACKPACK_SERVICE_NOT_WIRED", "Backpack service not wired")

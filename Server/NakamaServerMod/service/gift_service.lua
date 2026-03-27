@@ -6,11 +6,13 @@ local M = {}
 local gift_domain = nil
 local iap_service = nil
 
+-- 按错误码键统一构造失败响应。
 local function fail_by_key(key, fallback_message)
     local code, message = error_codes.resolve(key, fallback_message)
     return response.fail(code, message)
 end
 
+-- 把 gift 领域错误文本映射为标准错误码。
 local function fail_by_gift_error(err, default_key)
     local text = tostring(err or "")
     local key = default_key or "COMMON_INTERNAL_ERROR"
@@ -28,6 +30,7 @@ local function fail_by_gift_error(err, default_key)
     return fail_by_key(key, text)
 end
 
+-- 注入背包网关并完成 gift domain 装配。
 function M.wire_item_gateway(backpack, gift)
     if type(gift) ~= "table" or type(gift.set_item_gateway) ~= "function" then
         return
@@ -43,10 +46,12 @@ function M.wire_item_gateway(backpack, gift)
     gift_domain = gift
 end
 
+-- 注入 IAP service，用于礼包下单。
 function M.set_iap_service(service)
     iap_service = service
 end
 
+-- 解析 RPC 入参，解析失败时返回空表。
 local function decode_payload(payload)
     if payload and payload ~= "" then
         local ok, req = pcall(function()
@@ -59,10 +64,12 @@ local function decode_payload(payload)
     return {}
 end
 
+-- 统一未装配场景的错误返回。
 local function service_not_wired()
     return fail_by_key("GIFT_SERVICE_NOT_WIRED", "Gift service not wired")
 end
 
+-- 获取礼包运行态（购买进度、可见性、分天奖励状态等）。
 function M.rpc_gift_get_state(context, payload)
     if not gift_domain then
         return service_not_wired()
@@ -72,6 +79,7 @@ function M.rpc_gift_get_state(context, payload)
     return response.ok(state)
 end
 
+-- 创建礼包订单：先校验资格，再委托 IAP 下单。
 function M.rpc_gift_create_order(context, payload)
     if not gift_domain then
         return service_not_wired()
@@ -111,6 +119,7 @@ function M.rpc_gift_create_order(context, payload)
     })
 end
 
+-- 礼包支付回调：落幂等并发放即时奖励。
 function M.rpc_gift_pay_callback(context, payload)
     if not gift_domain then
         return service_not_wired()
@@ -135,6 +144,7 @@ function M.rpc_gift_pay_callback(context, payload)
     return response.ok(result_or_err)
 end
 
+-- 领取礼包分天奖励。
 function M.rpc_gift_claim_day_reward(context, payload)
     if not gift_domain then
         return service_not_wired()
@@ -155,6 +165,7 @@ function M.rpc_gift_claim_day_reward(context, payload)
     return response.ok(result_or_err)
 end
 
+-- 调试接口：切换首充礼包解锁状态。
 function M.rpc_gift_debug_unlock_first_recharge(context, payload)
     if not gift_domain then
         return service_not_wired()

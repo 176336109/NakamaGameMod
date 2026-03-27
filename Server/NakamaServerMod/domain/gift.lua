@@ -16,6 +16,7 @@ local item_gateway = {
     end
 }
 
+-- 注入道具网关，用于礼包发放与回滚。
 function M.set_item_gateway(gateway)
     if type(gateway) ~= "table" then
         return
@@ -28,10 +29,12 @@ function M.set_item_gateway(gateway)
     end
 end
 
+-- 返回当前秒级时间戳。
 local function now_ts()
     return os.time()
 end
 
+-- 深拷贝 table，避免状态对象被引用污染。
 local function deep_copy(v)
     if type(v) ~= "table" then
         return v
@@ -43,16 +46,19 @@ local function deep_copy(v)
     return out
 end
 
+-- 生成北京时间日期键（YYYYMMDD）。
 local function get_beijing_date_key(ts)
     return os.date("!%Y%m%d", ts + BEIJING_OFFSET_SECONDS)
 end
 
+-- 计算下一个北京时间零点时间戳。
 local function get_next_beijing_midnight(ts)
     local beijing_day = math.floor((ts + BEIJING_OFFSET_SECONDS) / 86400)
     local next_day_start_beijing = (beijing_day + 1) * 86400
     return next_day_start_beijing - BEIJING_OFFSET_SECONDS
 end
 
+-- 归一化奖励道具结构（id + count）。
 local function normalize_reward_items(items)
     local out = {}
     if type(items) ~= "table" then
@@ -70,6 +76,7 @@ local function normalize_reward_items(items)
     return out
 end
 
+-- 保证礼包状态结构完整。
 local function ensure_state_shape(state)
     if type(state) ~= "table" then
         state = {}
@@ -89,6 +96,7 @@ local function ensure_state_shape(state)
     return state
 end
 
+-- 读取礼包状态与版本号。
 local function load_state(user_id)
     local objects = nk.storage_read({
         {
@@ -103,6 +111,7 @@ local function load_state(user_id)
     return ensure_state_shape({}), nil
 end
 
+-- 按 CAS 版本写回礼包状态。
 local function save_state(user_id, state, version)
     local obj = {
         collection = COLLECTION,
@@ -118,6 +127,7 @@ local function save_state(user_id, state, version)
     nk.storage_write({ obj })
 end
 
+-- 读取指定礼包配置。
 local function get_pack_config(pack_id)
     if type(config.gift) ~= "table" or type(config.gift.packs) ~= "table" then
         return nil
@@ -125,6 +135,7 @@ local function get_pack_config(pack_id)
     return config.gift.packs[pack_id]
 end
 
+-- 判断礼包是否处于有效活动时间。
 local function is_pack_active(pack_cfg, now)
     local range = pack_cfg and pack_cfg.activeTimeRange
     if type(range) ~= "table" then
@@ -141,6 +152,7 @@ local function is_pack_active(pack_cfg, now)
     return true
 end
 
+-- 生成限购周期键（永久/每日/活动期）。
 local function resolve_cycle_key(pack_cfg, activity_id, now)
     if pack_cfg.limitType == "daily" then
         return get_beijing_date_key(now)
@@ -151,6 +163,7 @@ local function resolve_cycle_key(pack_cfg, activity_id, now)
     return nil
 end
 
+-- 计算当前周期的限购进度。
 local function compute_limit_progress(pack_cfg, purchase_state, cycle_key)
     local progress = 0
     if type(purchase_state) ~= "table" then
@@ -166,6 +179,7 @@ local function compute_limit_progress(pack_cfg, purchase_state, cycle_key)
     return progress
 end
 
+-- 校验是否允许购买礼包并返回上下文数据。
 local function validate_purchase(state, pack_id, activity_id, now)
     local pack_cfg = get_pack_config(pack_id)
     if type(pack_cfg) ~= "table" then
@@ -190,6 +204,7 @@ local function validate_purchase(state, pack_id, activity_id, now)
     return true, nil, pack_cfg, cycle_key, progress
 end
 
+-- 生成购买后的状态快照。
 local function make_purchase_state(pack_cfg, previous_state, cycle_key, order_id, now)
     local next_state = deep_copy(previous_state or {})
     next_state.packId = pack_cfg.packId
@@ -211,12 +226,14 @@ local function make_purchase_state(pack_cfg, previous_state, cycle_key, order_id
     return next_state
 end
 
+-- 按 dayIndex 对分天奖励排序。
 local function sort_day_rewards(day_rewards)
     table.sort(day_rewards, function(a, b)
         return (a.dayIndex or 0) < (b.dayIndex or 0)
     end)
 end
 
+-- 构建首充分天奖励状态（含 unlockAt）。
 local function build_first_recharge_stage_state(pack_cfg, purchase_at)
     local day_rewards_raw = deep_copy(pack_cfg.firstRecharge30DayRewards or {})
     local day_rewards = {}
@@ -255,6 +272,7 @@ local function build_first_recharge_stage_state(pack_cfg, purchase_at)
     }
 end
 
+-- 刷新分天奖励可领取状态（locked -> claimable）。
 local function refresh_day_states(stage_state, now)
     local changed = false
     for _, slot in ipairs(stage_state.dayStates or {}) do
@@ -266,6 +284,7 @@ local function refresh_day_states(stage_state, now)
     return changed
 end
 
+-- 查找指定天数的领取状态。
 local function find_day_state(stage_state, day_index)
     for _, slot in ipairs(stage_state.dayStates or {}) do
         if tonumber(slot.dayIndex) == tonumber(day_index) then
@@ -275,6 +294,7 @@ local function find_day_state(stage_state, day_index)
     return nil
 end
 
+-- 查找指定天数的奖励配置。
 local function find_day_rewards(stage_state, day_index)
     for _, slot in ipairs(stage_state.dayRewards or {}) do
         if tonumber(slot.dayIndex) == tonumber(day_index) then
@@ -284,6 +304,7 @@ local function find_day_rewards(stage_state, day_index)
     return {}
 end
 
+-- 校验礼包购买资格（供下单前调用）。
 function M.check_purchase_eligibility(user_id, pack_id, activity_id)
     local state = ensure_state_shape(select(1, load_state(user_id)))
     local now = now_ts()
@@ -299,6 +320,7 @@ function M.check_purchase_eligibility(user_id, pack_id, activity_id)
     }
 end
 
+-- 支付成功后处理礼包购买：幂等、发放、落状态。
 function M.process_paid_purchase(context, user_id, order_id, pack_id, activity_id)
     local now = now_ts()
     local state, version = load_state(user_id)
@@ -356,6 +378,7 @@ function M.process_paid_purchase(context, user_id, order_id, pack_id, activity_i
     }
 end
 
+-- 领取首充礼包分天奖励。
 function M.claim_day_reward(context, user_id, pack_id, day_index)
     local now = now_ts()
     local state, version = load_state(user_id)
@@ -403,6 +426,7 @@ function M.claim_day_reward(context, user_id, pack_id, day_index)
     }
 end
 
+-- 组装单个礼包运行时展示数据。
 local function build_pack_runtime_state(state, pack_id, pack_cfg, activity_id, now)
     local cycle_key = resolve_cycle_key(pack_cfg, activity_id, now)
     local purchase_state = state.purchaseStates[pack_id]
@@ -433,6 +457,7 @@ local function build_pack_runtime_state(state, pack_id, pack_cfg, activity_id, n
     }
 end
 
+-- 获取礼包整体状态快照（含礼包列表、进度与分天状态）。
 function M.get_state_data(user_id, activity_id)
     local now = now_ts()
     local state, version = load_state(user_id)
@@ -490,6 +515,7 @@ function M.get_state_data(user_id, activity_id)
     }
 end
 
+-- 设置首充解锁状态（调试/运营工具使用）。
 function M.set_first_recharge_unlocked(user_id, unlocked)
     local state, version = load_state(user_id)
     state.firstRechargeUnlocked = unlocked == true

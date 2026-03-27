@@ -6,11 +6,13 @@ local response = require("service.response")
 local M = {}
 local iap_domain = nil
 
+-- 统一按错误码键构造失败响应。
 local function fail_by_key(key, fallback_message)
     local code, message = error_codes.resolve(key, fallback_message)
     return response.fail(code, message)
 end
 
+-- 注入背包网关到 iap domain，用于发货阶段加物品。
 function M.wire_item_gateway(backpack, iap)
     if type(iap) ~= "table" or type(iap.set_item_gateway) ~= "function" then
         return
@@ -26,6 +28,7 @@ function M.wire_item_gateway(backpack, iap)
     iap_domain = iap
 end
 
+-- 支付回调入口：做参数校验、幂等检查、发货并落 processed_orders。
 function M.rpc_pay_callback(context, payload)
     nk.logger_info("RPC pay_callback called. Payload: " .. (payload or "nil"))
 
@@ -116,6 +119,7 @@ function M.rpc_pay_callback(context, payload)
     end
 end
 
+-- 创建支付订单：mock 渠道本地生成订单，其它渠道转发 PayGateway。
 function M.rpc_create_order(context, payload)
     nk.logger_info("RPC create_order called. Payload: " .. (payload or "nil"))
 
@@ -176,6 +180,7 @@ function M.rpc_create_order(context, payload)
     return nk.json_encode(order_result)
 end
 
+-- 触发 mock 渠道支付通知，便于联调支付回调链路。
 function M.rpc_mock_pay(context, payload)
     nk.logger_info("RPC mock_pay called. Payload: " .. (payload or "nil"))
 

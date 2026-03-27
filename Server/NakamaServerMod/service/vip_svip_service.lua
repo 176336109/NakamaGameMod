@@ -7,6 +7,7 @@ local vip_domain = nil
 local iap_domain = nil
 local iap_service = nil
 
+-- domain 文本错误到统一错误码的映射表。
 local DOMAIN_ERROR_MAP = {
     ["Invalid benefit plan"] = "VIP_PLAN_INVALID",
     ["Exceeds maximum cumulative days"] = "VIP_EXCEEDS_MAX_CUMULATIVE_DAYS",
@@ -18,6 +19,7 @@ local DOMAIN_ERROR_MAP = {
     ["Invalid plan_id. Must be 'vip_monthly' or 'svip_monthly'"] = "VIP_INVALID_PLAN_ID"
 }
 
+-- 注入背包网关并装配 VIP/SVIP domain。
 function M.wire_item_gateway(backpack, vip_svip)
     if type(vip_svip) ~= "table" or type(vip_svip.set_item_gateway) ~= "function" then
         return
@@ -33,6 +35,7 @@ function M.wire_item_gateway(backpack, vip_svip)
     vip_domain = vip_svip
 end
 
+-- 注入 iap domain，并挂接订阅激活回调到 VIP 购买链路。
 function M.set_iap_domain(iap)
     iap_domain = iap
     if iap_domain and type(iap_domain.set_subscription_gateway) == "function" and vip_domain then
@@ -50,10 +53,12 @@ function M.set_iap_domain(iap)
     end
 end
 
+-- 注入 iap service，用于创建支付订单。
 function M.set_iap_service(service)
     iap_service = service
 end
 
+-- 解析 RPC 入参，解析失败返回空表。
 local function decode_payload(payload)
     if payload and payload ~= "" then
         local ok, req = pcall(function() return nk.json_decode(payload) end)
@@ -64,22 +69,26 @@ local function decode_payload(payload)
     return {}
 end
 
+-- 统一服务未装配错误。
 local function service_not_wired()
     local code, message = error_codes.resolve("VIP_SERVICE_NOT_WIRED", "VIP service not wired")
     return response.fail(code, message)
 end
 
+-- 按错误码键构造失败响应。
 local function fail_by_key(key, fallback_message)
     local code, message = error_codes.resolve(key, fallback_message)
     return response.fail(code, message)
 end
 
+-- 统一映射 domain 错误文本到标准错误码。
 local function fail_by_domain_error(err, default_key)
     local text = tostring(err or "")
     local key = DOMAIN_ERROR_MAP[text] or default_key or "COMMON_INTERNAL_ERROR"
     return fail_by_key(key, text)
 end
 
+-- 创建 VIP 购买订单。
 function M.rpc_purchase_vip(context, payload)
     if not vip_domain then return service_not_wired() end
     local req = decode_payload(payload)
@@ -106,6 +115,7 @@ function M.rpc_purchase_vip(context, payload)
     return response.ok({ payment_required = true, order = order_result })
 end
 
+-- 创建 SVIP 购买订单。
 function M.rpc_purchase_svip(context, payload)
     if not vip_domain then return service_not_wired() end
     local req = decode_payload(payload)
@@ -132,6 +142,7 @@ function M.rpc_purchase_svip(context, payload)
     return response.ok({ payment_required = true, order = order_result })
 end
 
+-- 领取 VIP 每日奖励。
 function M.rpc_claim_vip_daily(context, payload)
     if not vip_domain then return service_not_wired() end
     local ok, err = vip_domain.claim_vip_daily(context, context.user_id)
@@ -139,6 +150,7 @@ function M.rpc_claim_vip_daily(context, payload)
     return response.ok()
 end
 
+-- 领取 SVIP 每日奖励。
 function M.rpc_claim_svip_daily(context, payload)
     if not vip_domain then return service_not_wired() end
     local ok, err = vip_domain.claim_svip_daily(context, context.user_id)
@@ -146,6 +158,7 @@ function M.rpc_claim_svip_daily(context, payload)
     return response.ok()
 end
 
+-- 一键领取 VIP/SVIP 每日奖励。
 function M.rpc_claim_all_daily(context, payload)
     if not vip_domain then return service_not_wired() end
     local ok, err = vip_domain.claim_all_daily(context, context.user_id)
@@ -153,53 +166,63 @@ function M.rpc_claim_all_daily(context, payload)
     return response.ok()
 end
 
+-- 获取 VIP/SVIP 激活状态与剩余天数。
 function M.rpc_get_vip_status(context, payload)
     if not vip_domain then return service_not_wired() end
     return nk.json_encode(vip_domain.get_vip_status(context, context.user_id))
 end
 
+-- 获取运行态快照（特权与日切状态）。
 function M.rpc_get_runtime_snapshot(context, payload)
     if not vip_domain then return service_not_wired() end
     return nk.json_encode(vip_domain.get_runtime_snapshot(context, context.user_id))
 end
 
+-- 校验复活权限。
 function M.rpc_check_revive_permission(context, payload)
     if not vip_domain then return service_not_wired() end
     return nk.json_encode(vip_domain.check_revive_permission(context, context.user_id))
 end
 
+-- 记录复活使用次数。
 function M.rpc_record_revive_usage(context, payload)
     if not vip_domain then return service_not_wired() end
     local req = decode_payload(payload)
     return nk.json_encode({ success = vip_domain.record_revive_usage(context, context.user_id, req.used_ad) })
 end
 
+-- 校验扫荡权限。
 function M.rpc_check_sweep_permission(context, payload)
     if not vip_domain then return service_not_wired() end
     return nk.json_encode(vip_domain.check_sweep_permission(context, context.user_id))
 end
 
+-- 记录扫荡使用次数。
 function M.rpc_record_sweep_usage(context, payload)
     if not vip_domain then return service_not_wired() end
     return nk.json_encode({ success = vip_domain.record_sweep_usage(context, context.user_id) })
 end
 
+-- 校验磁铁权限。
 function M.rpc_check_magnet_permission(context, payload)
     if not vip_domain then return service_not_wired() end
     return nk.json_encode(vip_domain.check_magnet_permission(context, context.user_id))
 end
 
+-- 校验掠夺权限。
 function M.rpc_check_plunder_permission(context, payload)
     if not vip_domain then return service_not_wired() end
     return nk.json_encode(vip_domain.check_plunder_permission(context, context.user_id))
 end
 
+-- 记录掠夺使用次数（含广告分支）。
 function M.rpc_record_plunder_usage(context, payload)
     if not vip_domain then return service_not_wired() end
     local req = decode_payload(payload)
     return nk.json_encode({ success = vip_domain.record_plunder_usage(context, context.user_id, req.is_ad) })
 end
 
+-- 校验额外队列权限。
 function M.rpc_check_queue_permission(context, payload)
     if not vip_domain then return service_not_wired() end
     return nk.json_encode(vip_domain.check_queue_permission(context, context.user_id))

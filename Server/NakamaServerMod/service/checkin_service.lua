@@ -7,11 +7,13 @@ local M = {}
 local backpack_gateway = nil
 local checkin_domain = nil
 
+-- 统一签到错误输出，并保留 legacy_error_code 兼容字段。
 local function fail_checkin(code_key, message, legacy_error_code)
     local code, resolved_message = error_codes.resolve(code_key, message)
     return response.fail(code, resolved_message, { legacy_error_code = legacy_error_code or code_key })
 end
 
+-- 解析钱包对象（table 或 JSON 字符串）为 table。
 local function decode_wallet_value(wallet_value)
     if type(wallet_value) == "table" then
         return wallet_value
@@ -25,6 +27,7 @@ local function decode_wallet_value(wallet_value)
     return {}
 end
 
+-- 从道具列表中提取货币类 item_id，用于前后钱包差分统计。
 local function collect_currency_ids(items)
     local ids = {}
     if type(items) ~= "table" then
@@ -43,6 +46,7 @@ local function collect_currency_ids(items)
     return ids
 end
 
+-- 合并货币 id 集合。
 local function merge_currency_ids(target, source)
     for item_id, enabled in pairs(source or {}) do
         if enabled then
@@ -52,6 +56,7 @@ local function merge_currency_ids(target, source)
     return target
 end
 
+-- 读取指定货币当前余额。
 local function read_wallet_amounts(user_id, currency_ids)
     local has_currency = false
     for _ in pairs(currency_ids or {}) do
@@ -73,6 +78,7 @@ local function read_wallet_amounts(user_id, currency_ids)
     return out
 end
 
+-- 计算钱包余额差异，供客户端展示本次增减明细。
 local function build_wallet_changes(currency_ids, before_wallet, after_wallet)
     local out = {}
     for item_id, _ in pairs(currency_ids or {}) do
@@ -91,11 +97,13 @@ local function build_wallet_changes(currency_ids, before_wallet, after_wallet)
     return out
 end
 
+-- 注入背包网关与签到领域依赖。
 function M.wire_item_gateway(backpack, checkin)
     backpack_gateway = backpack
     checkin_domain = checkin
 end
 
+-- 获取签到状态快照。
 function M.rpc_checkin_get_state(context, payload)
     if not checkin_domain then
         return fail_checkin("CHECKIN_SERVICE_NOT_WIRED", "Checkin service not wired", "CHECKIN_SERVICE_ERROR")
@@ -103,6 +111,7 @@ function M.rpc_checkin_get_state(context, payload)
     return response.ok(checkin_domain.get_state_data(context.user_id))
 end
 
+-- 每日签到：校验状态、发放奖励、写回签到快照并返回钱包变化。
 function M.rpc_daily_checkin(context, payload)
     if not checkin_domain or not backpack_gateway then
         return fail_checkin("CHECKIN_SERVICE_NOT_WIRED", "Checkin service not wired", "CHECKIN_SERVICE_ERROR")
@@ -153,6 +162,7 @@ function M.rpc_daily_checkin(context, payload)
     })
 end
 
+-- 补签：扣除补签成本、发奖励、写回快照并返回钱包变化。
 function M.rpc_checkin_makeup(context, payload)
     if not checkin_domain or not backpack_gateway then
         return fail_checkin("CHECKIN_SERVICE_NOT_WIRED", "Checkin service not wired", "CHECKIN_SERVICE_ERROR")
@@ -234,6 +244,7 @@ function M.rpc_checkin_makeup(context, payload)
     })
 end
 
+-- 调试接口：设置时间偏移。
 function M.rpc_debug_set_time_offset(context, payload)
     if not checkin_domain then
         return fail_checkin("CHECKIN_SERVICE_NOT_WIRED", "Checkin service not wired", "CHECKIN_SERVICE_ERROR")

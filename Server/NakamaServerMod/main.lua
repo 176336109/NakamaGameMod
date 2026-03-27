@@ -13,6 +13,7 @@ local shop_service = require("service.shop_service")
 local vip_svip_service = require("service.vip_svip_service")
 local iap_service = require("service.iap_service")
 local gift_service = require("service.gift_service")
+local config_service = require("service.config_service")
 
 -- NakamaMod/main.lua
 -- Nakama Lua runtime 使用顶层代码直接注册 RPC，不需要 InitModule / initializer。
@@ -98,5 +99,6 @@ nk.register_rpc(gift_service.rpc_gift_create_order, "gift_create_order")
 nk.register_rpc(gift_service.rpc_gift_pay_callback, "gift_pay_callback")
 nk.register_rpc(gift_service.rpc_gift_claim_day_reward, "gift_claim_day_reward")
 nk.register_rpc(gift_service.rpc_gift_debug_unlock_first_recharge, "gift_debug_unlock_first_recharge")
+nk.register_rpc(config_service.rpc_config_get, "config_get")
 
 nk.logger_info("----> [NakamaServerMod] All RPCs registered OK <----")
