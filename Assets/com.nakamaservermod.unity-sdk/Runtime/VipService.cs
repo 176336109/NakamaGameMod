@@ -148,15 +148,5 @@ namespace NakamaServerMod.UnitySdk
             return _client.RpcAsync<string, QueuePermissionResponse>("check_queue_permission", "{}");
         }
 
-        /// <summary>
-        /// [Debug] 模拟IAP购买（生成购买记录）
-        /// </summary>
-        /// <param name="planId">计划ID ("vip_monthly" 或 "svip_monthly")</param>
-        /// <returns>物品数据响应</returns>
-        public Task<ItemDataResponse> DebugSimulatePurchaseAsync(string planId)
-        {
-            var request = new DebugSimulatePurchaseRequest { plan_id = planId };
-            return _client.RpcAsync<DebugSimulatePurchaseRequest, ItemDataResponse>("debug_simulate_purchase", request);
-        }
     }
 }

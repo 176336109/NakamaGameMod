@@ -405,6 +405,20 @@ end
 M.checkin = checkin_json
 M.checkin.rewards = normalize_number_key_table(M.checkin.rewards)
 
+local gift_json = load_json_file("gift.json")
+if gift_json == nil or type(gift_json.packs) ~= "table" then
+    error("FAILED_TO_LOAD_GIFT_JSON: gift.json not found/readable or invalid")
+end
+M.gift = gift_json
+
+for pack_id, pack_cfg in pairs(M.gift.packs) do
+    if type(M.iap_products[pack_id]) ~= "table" then
+        M.iap_products[pack_id] = {
+            rewards = pack_cfg.immediateRewardItems or {}
+        }
+    end
+end
+
 -- 管理端相关配置
 M.admin = {
     inventory_log_admin_token = "",

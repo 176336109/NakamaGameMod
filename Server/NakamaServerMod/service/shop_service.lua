@@ -1,24 +1,35 @@
 local nk = require("nakama")
 local config = require("config")
+local error_codes = require("domain.error_codes")
+local response = require("service.response")
 
 local M = {}
 local backpack_gateway = nil
 local shop_domain = nil
 local iap_service = nil
 
+-- 按错误码键统一构造失败响应。
+local function fail_by_key(key, fallback_message)
+    local code, message = error_codes.resolve(key, fallback_message)
+    return response.fail(code, message)
+end
+
+-- 注入背包与商店领域依赖。
 function M.wire_item_gateway(backpack, shop)
     backpack_gateway = backpack
     shop_domain = shop
 end
 
+-- 注入 IAP service，处理 RMB 商品下单。
 function M.set_iap_service(service)
     iap_service = service
 end
 
+-- 统一处理支付：RMB 走 IAP，下游货币走背包扣费。
 local function handle_payment(context, user_id, goods_id, cost_type, cost_value, req)
     if cost_type == "rmb" then
         if not iap_service or type(iap_service.rpc_create_order) ~= "function" then
-            return false, nk.json_encode({ success = false, error = "IAP service not wired" })
+            return false, fail_by_key("IAP_SERVICE_NOT_WIRED", "IAP service not wired")
         end
         local provider = req.provider or "mock"
         local order_payload = nk.json_encode({
@@ -28,13 +39,16 @@ local function handle_payment(context, user_id, goods_id, cost_type, cost_value,
         local order_raw = iap_service.rpc_create_order(context, order_payload)
         local ok_decode, order_result = pcall(nk.json_decode, order_raw or "")
         if not ok_decode or type(order_result) ~= "table" then
-            return false, nk.json_encode({ success = false, error = "Create order failed" })
+            return false, fail_by_key("SHOP_CREATE_ORDER_FAILED", "Create order failed")
         end
         if order_result.success == false then
-            return false, nk.json_encode({ success = false, error = order_result.error or "Create order failed" })
+            local err_message = order_result.error
+            if type(err_message) == "table" then
+                err_message = err_message.message
+            end
+            return false, fail_by_key("SHOP_CREATE_ORDER_FAILED", tostring(err_message or "Create order failed"))
         end
-        return false, nk.json_encode({
-            success = true,
+        return false, response.ok({
             payment_required = true,
             goodsId = goods_id,
             order = order_result
@@ -43,41 +57,43 @@ local function handle_payment(context, user_id, goods_id, cost_type, cost_value,
 
     local ok_cost, err_cost = backpack_gateway.consume_items(context, user_id, {{ id = cost_type, count = cost_value }}, "shop_buy_" .. goods_id)
     if not ok_cost then
-        return false, nk.json_encode({ success = false, error = "Insufficient funds: " .. (err_cost or "") })
+        return false, fail_by_key("WALLET_INSUFFICIENT_GEM", "Insufficient funds: " .. (err_cost or ""))
     end
 
     return true, nil
 end
 
+-- 获取商店快照与各类商品进度。
 function M.rpc_shop_get_state(context, payload)
     if not shop_domain or type(shop_domain.get_state_data) ~= "function" then
-        return nk.json_encode({ success = false, error = "Shop service not wired" })
+        return fail_by_key("SHOP_SERVICE_NOT_WIRED", "Shop service not wired")
     end
-    local response = shop_domain.get_state_data(context.user_id)
-    response.success = true
-    return nk.json_encode(response)
+    local state_data = shop_domain.get_state_data(context.user_id)
+    return response.ok(state_data)
 end
 
+-- 刷新特惠商店随机快照并扣除刷新成本。
 function M.rpc_shop_refresh(context, payload)
     if not backpack_gateway or not shop_domain then
-        return nk.json_encode({ success = false, error = "Shop service not wired" })
+        return fail_by_key("SHOP_SERVICE_NOT_WIRED", "Shop service not wired")
     end
 
     local user_id = context.user_id
     local cost_cfg = config.shop.refresh_cost
     local ok, err = backpack_gateway.consume_items(context, user_id, {{ id = cost_cfg.item_id, count = cost_cfg.count }}, "shop_refresh")
     if not ok then
-        return nk.json_encode({ success = false, error = "Insufficient crystals: " .. (err or "") })
+        return fail_by_key("WALLET_INSUFFICIENT_GEM", "Insufficient crystals: " .. (err or ""))
     end
 
     local snapshot = shop_domain.generate_special_snapshot()
     shop_domain.save_shop_snapshot(user_id, snapshot)
-    return nk.json_encode({ success = true, snapshot = snapshot })
+    return response.ok({ snapshot = snapshot })
 end
 
+-- 商品购买入口：校验限购、扣费、发奖并写回进度。
 function M.rpc_shop_buy(context, payload)
     if not backpack_gateway or not shop_domain then
-        return nk.json_encode({ success = false, error = "Shop service not wired" })
+        return fail_by_key("SHOP_SERVICE_NOT_WIRED", "Shop service not wired")
     end
 
     local req = nk.json_decode(payload)
@@ -85,7 +101,7 @@ function M.rpc_shop_buy(context, payload)
     local user_id = context.user_id
     local cfg = config.shop.goods[goods_id]
     if not cfg then
-        return nk.json_encode({ success = false, error = "Goods not found" })
+        return fail_by_key("SHOP_GOODS_NOT_FOUND", "Goods not found")
     end
 
     local today_str = shop_domain.get_beijing_today_str()
@@ -98,7 +114,7 @@ function M.rpc_shop_buy(context, payload)
     local limit_value = tonumber(cfg.limitValue) or 0
 
     if limit_type ~= "none" and progress >= limit_value then
-        return nk.json_encode({ success = false, error = "Limit reached" })
+        return fail_by_key("SHOP_LIMIT_REACHED", "Limit reached")
     end
 
     local cost_type = cfg.costType
@@ -114,7 +130,7 @@ function M.rpc_shop_buy(context, payload)
             end
         end
         if not found then
-            return nk.json_encode({ success = false, error = "Item not in current snapshot" })
+            return fail_by_key("SHOP_INVALID_PARAM", "Item not in current snapshot")
         end
     end
 
@@ -126,13 +142,13 @@ function M.rpc_shop_buy(context, payload)
     local ok_reward, err_reward = backpack_gateway.add_items(context, user_id, cfg.rewardItems, "shop_buy_" .. goods_id)
     if not ok_reward then
         nk.logger_error("Reward grant failed after cost deduction! User: " .. user_id .. " Goods: " .. goods_id)
-        return nk.json_encode({ success = false, error = "Grant reward failed: " .. (err_reward or "") })
+        return fail_by_key("SHOP_GRANT_FAILED", "Grant reward failed: " .. (err_reward or ""))
     end
 
     state = shop_domain.apply_limit_progress(cfg, state, snapshot.snapshotId, today_str, week_key)
     limit_state[goods_id] = state
     shop_domain.save_limit_state(user_id, limit_state, limit_version)
-    return nk.json_encode({ success = true, progress = state.progress })
+    return response.ok({ progress = state.progress })
 end
 
 return M

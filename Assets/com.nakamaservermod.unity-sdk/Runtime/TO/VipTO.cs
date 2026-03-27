@@ -122,7 +122,9 @@ namespace NakamaServerMod.UnitySdk
     public class InventoryItemsResponse
     {
         public bool success; // 是否成功
-        public RpcError error; // 错误信息
+        public string error; // 错误信息
+        public long error_code; // 错误码
+        public RpcErrorDetail error_detail; // 错误详情
         public InventoryItem[] items; // 物品列表
         public InventoryState state; // 背包状态
     }
@@ -135,9 +137,9 @@ namespace NakamaServerMod.UnitySdk
     }
 
     [Serializable]
-    public class RpcError
+    public class RpcErrorDetail
     {
-        public string code; // 错误码
+        public long code; // 错误码
         public string message; // 错误描述
     }
 
@@ -182,7 +184,9 @@ namespace NakamaServerMod.UnitySdk
     public class InventoryListResponse
     {
         public bool success; // 是否成功
-        public RpcError error; // 错误信息
+        public string error; // 错误信息
+        public long error_code; // 错误码
+        public RpcErrorDetail error_detail; // 错误详情
         public List<InventoryListItem> items; // 分页结果
         public string cursor; // 下一页游标
         public InventoryState state; // 背包状态
@@ -192,7 +196,9 @@ namespace NakamaServerMod.UnitySdk
     public class InventoryItemDefsResponse
     {
         public bool success; // 是否成功
-        public RpcError error; // 错误信息
+        public string error; // 错误信息
+        public long error_code; // 错误码
+        public RpcErrorDetail error_detail; // 错误详情
         public List<InventoryItemDef> items; // 物品定义列表
     }
 
@@ -200,7 +206,9 @@ namespace NakamaServerMod.UnitySdk
     public class InventoryAllInfoResponse
     {
         public bool success; // 是否成功
-        public RpcError error; // 错误信息
+        public string error; // 错误信息
+        public long error_code; // 错误码
+        public RpcErrorDetail error_detail; // 错误详情
         public List<InventoryItemDef> itemDefs; // 物品定义
         public List<InventoryListItem> backpackItems; // 背包物品列表
         public string cursor; // 下一页游标
@@ -228,7 +236,9 @@ namespace NakamaServerMod.UnitySdk
     public class InventoryLogListResponse
     {
         public bool success; // 是否成功
-        public RpcError error; // 错误信息
+        public string error; // 错误信息
+        public long error_code; // 错误码
+        public RpcErrorDetail error_detail; // 错误详情
         public List<InventoryLogEntry> logs; // 日志列表
         public string cursor; // 下一页游标
     }
@@ -237,7 +247,9 @@ namespace NakamaServerMod.UnitySdk
     public class WalletGetResponse
     {
         public bool success; // 是否成功
-        public RpcError error; // 错误信息
+        public string error; // 错误信息
+        public long error_code; // 错误码
+        public RpcErrorDetail error_detail; // 错误详情
         public Dictionary<string, long> wallet; // 钱包数据
     }
 
@@ -264,7 +276,9 @@ namespace NakamaServerMod.UnitySdk
     public class BackpackMutationResponse
     {
         public bool success; // 是否成功
-        public RpcError error; // 错误信息
+        public string error; // 错误信息
+        public long error_code; // 错误码
+        public RpcErrorDetail error_detail; // 错误详情
         public BackpackMutationResult result; // 变更结果
     }
 
@@ -272,7 +286,9 @@ namespace NakamaServerMod.UnitySdk
     public class BackpackGetStateResponse
     {
         public bool success; // 是否成功
-        public RpcError error; // 错误信息
+        public string error; // 错误信息
+        public long error_code; // 错误码
+        public RpcErrorDetail error_detail; // 错误详情
         public InventoryState state; // 背包状态
     }
 }

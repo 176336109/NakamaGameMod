@@ -10,6 +10,7 @@ local CHECKIN_KEY = "checkin"
 local TIME_OFFSET = 8 * 3600
 
 -- Helper to get current timestamp (with debug offset support)
+-- 读取当前时间戳，支持按用户写入的 time_offset 调试偏移。
 local function get_timestamp(user_id)
     local objs = nk.storage_read({ { collection = CHECKIN_COLLECTION, key = CHECKIN_KEY, user_id = user_id } })
     local offset = 0
@@ -21,11 +22,13 @@ end
 
 -- Calculate global day index based on Beijing Time
 -- This represents the "DateKey" concept (days since epoch shifted by timezone)
+-- 把时间戳转换为北京时间自然日索引（用于跨天与周期计算）。
 local function get_day_index(ts)
     return math.floor((ts + TIME_OFFSET) / 86400)
 end
 
 -- Get cycle info based on account creation time and current time (Unified Criteria)
+-- 基于账号创建日与当前日计算签到周期号和周期内天序号。
 local function get_cycle_info(user_id)
     local account = nk.account_get_id(user_id)
     local create_ts = 0
@@ -61,6 +64,7 @@ local function get_cycle_info(user_id)
 end
 
 -- Load state from storage
+-- 读取用户签到状态快照与版本号。
 local function load_state(user_id)
     local objects = nk.storage_read({ { collection = CHECKIN_COLLECTION, key = CHECKIN_KEY, user_id = user_id } })
     local state = {}
@@ -75,6 +79,7 @@ local function load_state(user_id)
 end
 
 -- Save state to storage
+-- 按 CAS 版本写回签到状态；version 为空时走新写入。
 local function save_state(user_id, state, version)
     local write_obj = {
         collection = CHECKIN_COLLECTION,
@@ -90,6 +95,7 @@ local function save_state(user_id, state, version)
     nk.storage_write({ write_obj })
 end
 
+-- 构建 7 天默认状态数组，初始全部为 unsigned。
 local function build_unsigned_day_states()
     local day_states = {}
     for i = 1, 7 do
@@ -98,6 +104,7 @@ local function build_unsigned_day_states()
     return day_states
 end
 
+-- 重置到新周期快照，保留旧状态中的 time_offset 调试字段。
 local function reset_cycle_state(cycle_id_str, old_state, current_day_index, current_day)
     local cycle_start_date = current_day - (current_day_index - 1)
     local cycle_end_date = cycle_start_date + 6
@@ -116,6 +123,7 @@ local function reset_cycle_state(cycle_id_str, old_state, current_day_index, cur
     return state
 end
 
+-- 修正快照中的周期派生字段，返回是否发生变更。
 local function ensure_cycle_snapshot_fields(state, current_day_index, current_day)
     local cycle_start_date = current_day - (current_day_index - 1)
     local cycle_end_date = cycle_start_date + 6
@@ -144,10 +152,12 @@ local function ensure_cycle_snapshot_fields(state, current_day_index, current_da
 end
 
 -- Helper to make error response
+-- 统一错误结构输出（供 service 层复用）。
 local function make_error(code, message)
     return nk.json_encode({ error = message or code, error_code = code })
 end
 
+-- 归一化单个道具结构（兼容 id/item_id）。
 local function normalize_item(item)
     if type(item) ~= "table" then
         return nil
@@ -160,6 +170,7 @@ local function normalize_item(item)
     return { id = id, count = count }
 end
 
+-- 归一化道具列表，过滤非法项。
 local function normalize_items(items)
     local out = {}
     if type(items) ~= "table" then
@@ -174,6 +185,7 @@ local function normalize_items(items)
     return out
 end
 
+-- 聚合返回签到状态、每日奖励与补签成本；必要时自动刷新并落盘快照。
 function M.get_state_data(user_id)
     local cycle_no, current_day_index, current_day = get_cycle_info(user_id)
     local cycle_id_str = "C" .. tostring(cycle_no)
@@ -238,6 +250,7 @@ function M.get_state_data(user_id)
     }
 end
 
+-- 写入 dayStates 中某一天的领取结果，用于客户端展示与追踪。
 function M.set_day_claimed(state, day_index, status, claim_type, claim_at)
     if type(state) ~= "table" then
         return
@@ -257,6 +270,7 @@ function M.set_day_claimed(state, day_index, status, claim_type, claim_at)
     state.dayStates[idx] = slot
 end
 
+-- 设置当前用户签到时间偏移（调试用）。
 function M.set_time_offset(user_id, offset)
     local state, version = load_state(user_id)
     if type(state) ~= "table" then

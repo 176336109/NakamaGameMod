@@ -15,10 +15,12 @@ local M = {}
 local backpack_gateway = nil
 local subscription_gateway = nil
 
+-- 注入背包网关，用于发放IAP奖励道具。
 function M.set_item_gateway(gateway)
     backpack_gateway = gateway
 end
 
+-- 注入订阅网关，用于激活月卡等订阅权益。
 function M.set_subscription_gateway(gateway)
     subscription_gateway = gateway
 end

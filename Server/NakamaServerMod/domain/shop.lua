@@ -28,7 +28,7 @@ local function generate_snapshot_id()
     return nk.uuid_v4()
 end
 
--- 1. 加载限购状态
+-- 读取用户限购状态及版本号。
 local function load_limit_state(user_id)
     local objects = nk.storage_read({{ collection = COLLECTION, key = KEY_LIMITS, user_id = user_id }})
     if #objects > 0 then
@@ -37,7 +37,7 @@ local function load_limit_state(user_id)
     return {}, nil
 end
 
--- 2. 保存限购状态
+-- 写回用户限购状态。
 local function save_limit_state(user_id, state, version)
     nk.storage_write({{
         collection = COLLECTION,
@@ -50,7 +50,7 @@ local function save_limit_state(user_id, state, version)
     }})
 end
 
--- 3. 生成特惠商店随机商品（6个不重复）
+-- 生成特惠商店随机快照（6个不重复）。
 local function generate_special_snapshot()
     local all_random_goods = {}
     for id, cfg in pairs(config.shop.goods) do
@@ -113,7 +113,7 @@ local function generate_special_snapshot()
     return snapshot
 end
 
--- 4. 加载/自动刷新快照
+-- 读取并按跨天规则自动刷新特惠快照。
 local function load_shop_snapshot(user_id)
     local today_str = get_beijing_today_str()
     local objects = nk.storage_read({{ collection = COLLECTION, key = KEY_SNAPSHOT, user_id = user_id }})
@@ -142,6 +142,7 @@ local function load_shop_snapshot(user_id)
     return snapshot
 end
 
+-- 手动写入特惠快照。
 local function save_shop_snapshot(user_id, snapshot)
     nk.storage_write({{
         collection = COLLECTION,
@@ -153,6 +154,7 @@ local function save_shop_snapshot(user_id, snapshot)
     }})
 end
 
+-- 计算当前商品在对应限购周期内的进度值。
 local function compute_limit_progress(cfg, state, snapshot_id, today_str, week_key)
     local progress = 0
     if not state then
@@ -176,6 +178,7 @@ local function compute_limit_progress(cfg, state, snapshot_id, today_str, week_k
     return progress
 end
 
+-- 应用一次购买后的限购进度变更。
 local function apply_limit_progress(cfg, state, snapshot_id, today_str, week_key)
     state.progress = (state.progress or 0) + 1
     state.lastBuyAt = os.time()
@@ -190,6 +193,7 @@ local function apply_limit_progress(cfg, state, snapshot_id, today_str, week_key
     return state
 end
 
+-- 聚合商店状态：特惠快照、固定商品与各类限购进度。
 function M.get_state_data(user_id)
     local today_str = get_beijing_today_str()
     local week_key = get_beijing_week_key()

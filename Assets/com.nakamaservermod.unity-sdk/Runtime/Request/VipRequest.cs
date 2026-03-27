@@ -83,12 +83,4 @@ namespace NakamaServerMod.UnitySdk
         public object @ref; // 扩展引用信息
     }
 
-    /// <summary>
-    /// 模拟购买请求
-    /// </summary>
-    [Serializable]
-    public class DebugSimulatePurchaseRequest
-    {
-        public string plan_id; // 计划ID（vip_monthly / svip_monthly）
-    }
 }
