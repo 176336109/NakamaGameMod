@@ -5,12 +5,14 @@ local checkin = require("domain.checkin")
 local iap = require("domain.iap")
 local vip_svip = require("domain.vip_svip")
 local shop = require("domain.shop")
+local gift = require("domain.gift")
 local backpack_service = require("service.backpack_service")
 local checkin_service = require("service.checkin_service")
 local gacha_service = require("service.gacha_service")
 local shop_service = require("service.shop_service")
 local vip_svip_service = require("service.vip_svip_service")
 local iap_service = require("service.iap_service")
+local gift_service = require("service.gift_service")
 
 -- NakamaMod/main.lua
 -- Nakama Lua runtime 使用顶层代码直接注册 RPC，不需要 InitModule / initializer。
@@ -26,6 +28,8 @@ vip_svip_service.wire_item_gateway(backpack, vip_svip)
 vip_svip_service.set_iap_service(iap_service)
 iap_service.wire_item_gateway(backpack, iap)
 vip_svip_service.set_iap_domain(iap)
+gift_service.wire_item_gateway(backpack, gift)
+gift_service.set_iap_service(iap_service)
 
 -- 1) Backpack RPCs
 nk.register_rpc(backpack_service.rpc_debug_add_items, "debug_add_items")
@@ -89,5 +93,11 @@ nk.register_rpc(shop_service.rpc_shop_buy, "shop_buy")
 nk.register_rpc(iap_service.rpc_pay_callback, "pay_callback")
 nk.register_rpc(iap_service.rpc_create_order, "create_order")
 nk.register_rpc(iap_service.rpc_mock_pay, "mock_pay")
+
+nk.register_rpc(gift_service.rpc_gift_get_state, "gift_get_state")
+nk.register_rpc(gift_service.rpc_gift_create_order, "gift_create_order")
+nk.register_rpc(gift_service.rpc_gift_pay_callback, "gift_pay_callback")
+nk.register_rpc(gift_service.rpc_gift_claim_day_reward, "gift_claim_day_reward")
+nk.register_rpc(gift_service.rpc_gift_debug_unlock_first_recharge, "gift_debug_unlock_first_recharge")
 
 nk.logger_info("----> [NakamaServerMod] All RPCs registered OK <----")

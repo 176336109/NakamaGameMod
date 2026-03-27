@@ -1,0 +1,148 @@
+{
+    "packs": {
+        "GIFT_DAILY_6": {
+            "packId": "GIFT_DAILY_6",
+            "packType": "daily",
+            "packName": "每日6元礼包",
+            "priceCurrency": "rmb",
+            "priceAmount": 6,
+            "limitType": "daily",
+            "limitValue": 1,
+            "immediateRewardItems": [
+                { "id": "gem", "count": 80 },
+                { "id": "gold", "count": 15000 }
+            ]
+        },
+        "GIFT_DAILY_30": {
+            "packId": "GIFT_DAILY_30",
+            "packType": "daily",
+            "packName": "每日30元礼包",
+            "priceCurrency": "rmb",
+            "priceAmount": 30,
+            "limitType": "daily",
+            "limitValue": 1,
+            "immediateRewardItems": [
+                { "id": "gem", "count": 400 },
+                { "id": "gold", "count": 50000 }
+            ]
+        },
+        "GIFT_DAILY_98": {
+            "packId": "GIFT_DAILY_98",
+            "packType": "daily",
+            "packName": "每日98元礼包",
+            "priceCurrency": "rmb",
+            "priceAmount": 98,
+            "limitType": "daily",
+            "limitValue": 1,
+            "immediateRewardItems": [
+                { "id": "gem", "count": 1500 },
+                { "id": "gold", "count": 200000 }
+            ]
+        },
+        "GIFT_ACTIVITY_68": {
+            "packId": "GIFT_ACTIVITY_68",
+            "packType": "activity",
+            "packName": "活动68元礼包",
+            "priceCurrency": "rmb",
+            "priceAmount": 68,
+            "limitType": "activity_once",
+            "limitValue": 1,
+            "activityId": "ACT_DEFAULT",
+            "activeTimeRange": {
+                "startAt": 1577808000,
+                "endAt": 4102415999
+            },
+            "immediateRewardItems": [
+                { "id": "gem", "count": 800 },
+                { "id": "010300001", "count": 10 },
+                { "id": "gold", "count": 50000 }
+            ]
+        },
+        "GIFT_ACTIVITY_198": {
+            "packId": "GIFT_ACTIVITY_198",
+            "packType": "activity",
+            "packName": "活动198元礼包",
+            "priceCurrency": "rmb",
+            "priceAmount": 198,
+            "limitType": "activity_once",
+            "limitValue": 1,
+            "activityId": "ACT_DEFAULT",
+            "activeTimeRange": {
+                "startAt": 1577808000,
+                "endAt": 4102415999
+            },
+            "immediateRewardItems": [
+                { "id": "gem", "count": 3000 },
+                { "id": "010300001", "count": 30 },
+                { "id": "030300001", "count": 10 }
+            ]
+        },
+        "GIFT_ACTIVITY_328": {
+            "packId": "GIFT_ACTIVITY_328",
+            "packType": "activity",
+            "packName": "活动328元礼包",
+            "priceCurrency": "rmb",
+            "priceAmount": 328,
+            "limitType": "activity_once",
+            "limitValue": 1,
+            "activityId": "ACT_DEFAULT",
+            "activeTimeRange": {
+                "startAt": 1577808000,
+                "endAt": 4102415999
+            },
+            "immediateRewardItems": [
+                { "id": "gem", "count": 6000 },
+                { "id": "010300001", "count": 60 },
+                { "id": "hero_sr_001", "count": 1 }
+            ]
+        },
+        "GIFT_FIRST_6": {
+            "packId": "GIFT_FIRST_6",
+            "packType": "first_recharge",
+            "packName": "首充6元礼包",
+            "priceCurrency": "rmb",
+            "priceAmount": 6,
+            "limitType": "permanent",
+            "limitValue": 1,
+            "immediateRewardItems": [
+                { "id": "gem", "count": 120 },
+                { "id": "hero_r_001", "count": 1 }
+            ],
+            "firstRecharge30DayRewards": []
+        },
+        "GIFT_FIRST_30": {
+            "packId": "GIFT_FIRST_30",
+            "packType": "first_recharge",
+            "packName": "首充30元礼包",
+            "priceCurrency": "rmb",
+            "priceAmount": 30,
+            "limitType": "permanent",
+            "limitValue": 1,
+            "immediateRewardItems": [
+                { "id": "gem", "count": 400 },
+                { "id": "030100001", "count": 30 }
+            ],
+            "firstRecharge30DayRewards": [
+                {
+                    "dayIndex": 1,
+                    "rewardItems": [
+                        { "id": "020100001", "count": 15 }
+                    ]
+                },
+                {
+                    "dayIndex": 2,
+                    "rewardItems": [
+                        { "id": "030200001", "count": 15 },
+                        { "id": "020200001", "count": 12 }
+                    ]
+                },
+                {
+                    "dayIndex": 3,
+                    "rewardItems": [
+                        { "id": "020300001", "count": 1 }
+                    ]
+                }
+            ]
+        }
+    }
+}
