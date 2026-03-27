@@ -96,7 +96,7 @@ namespace NakamaServerMod.UnitySdk.Tests
             {
                 Assert.IsNotNull(result.order);
                 Assert.IsFalse(string.IsNullOrEmpty(result.order.order_id));
-                var payResult = await CompletePaymentAsync(client, result.order.order_id, "com.game.monthly_card");
+                var payResult = await CompletePaymentAsync(client, result.order.order_id, "vip");
                 Assert.IsTrue(payResult.success, payResult.error);
                 return;
             }
@@ -113,7 +113,7 @@ namespace NakamaServerMod.UnitySdk.Tests
             {
                 Assert.IsNotNull(result.order);
                 Assert.IsFalse(string.IsNullOrEmpty(result.order.order_id));
-                var payResult = await CompletePaymentAsync(client, result.order.order_id, "com.game.svip_monthly_card");
+                var payResult = await CompletePaymentAsync(client, result.order.order_id, "svip");
                 Assert.IsTrue(payResult.success, payResult.error);
                 return;
             }

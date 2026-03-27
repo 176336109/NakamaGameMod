@@ -1,4 +1,5 @@
 local nk = require("nakama")
+local config = require("config")
 local error_codes = require("domain.error_codes")
 local response = require("service.response")
 
@@ -15,9 +16,20 @@ local DOMAIN_ERROR_MAP = {
     ["State not found"] = "VIP_STATE_NOT_FOUND",
     ["No pending rewards"] = "VIP_NO_PENDING_REWARD",
     ["No rewards"] = "VIP_NO_PENDING_REWARD",
-    ["item gateway not configured"] = "COMMON_INTERNAL_ERROR",
-    ["Invalid plan_id. Must be 'vip_monthly' or 'svip_monthly'"] = "VIP_INVALID_PLAN_ID"
+    ["item gateway not configured"] = "COMMON_INTERNAL_ERROR"
 }
+
+local function resolve_product_id_by_plan(plan_id, fallback)
+    local products = config.monthly_products
+    if type(products) == "table" then
+        for _, product in ipairs(products) do
+            if type(product) == "table" and product.benefitPlanId == plan_id and type(product.productId) == "string" and product.productId ~= "" then
+                return product.productId
+            end
+        end
+    end
+    return fallback
+end
 
 -- 注入背包网关并装配 VIP/SVIP domain。
 function M.wire_item_gateway(backpack, vip_svip)
@@ -41,11 +53,11 @@ function M.set_iap_domain(iap)
     if iap_domain and type(iap_domain.set_subscription_gateway) == "function" and vip_domain then
         iap_domain.set_subscription_gateway({
             activate_subscription = function(context, user_id, plan_id, duration_days, product_id)
-                if plan_id == "vip_monthly" then
-                    return vip_domain.purchase_vip(context, user_id, duration_days or 30, "IAP购买VIP:" .. tostring(product_id), { skip_immediate_reward = true })
+                if plan_id == "vip" then
+                    return vip_domain.purchase_vip(context, user_id, duration_days or 30, "IAP购买VIP:" .. tostring(product_id))
                 end
-                if plan_id == "svip_monthly" then
-                    return vip_domain.purchase_svip(context, user_id, duration_days or 30, "IAP购买SVIP:" .. tostring(product_id), { skip_immediate_reward = true })
+                if plan_id == "svip" then
+                    return vip_domain.purchase_svip(context, user_id, duration_days or 30, "IAP购买SVIP:" .. tostring(product_id))
                 end
                 return false, "Unsupported benefit_plan_id: " .. tostring(plan_id)
             end
@@ -97,7 +109,7 @@ function M.rpc_purchase_vip(context, payload)
     end
     local provider = req.provider or "mock"
     local order_payload = nk.json_encode({
-        product_id = req.product_id or "com.game.monthly_card",
+        product_id = req.product_id or resolve_product_id_by_plan("vip", "vip"),
         provider = provider
     })
     local order_raw = iap_service.rpc_create_order(context, order_payload)
@@ -124,7 +136,7 @@ function M.rpc_purchase_svip(context, payload)
     end
     local provider = req.provider or "mock"
     local order_payload = nk.json_encode({
-        product_id = req.product_id or "com.game.svip_monthly_card",
+        product_id = req.product_id or resolve_product_id_by_plan("svip", "svip"),
         provider = provider
     })
     local order_raw = iap_service.rpc_create_order(context, order_payload)

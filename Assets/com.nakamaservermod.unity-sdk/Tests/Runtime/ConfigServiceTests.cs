@@ -44,8 +44,9 @@ namespace NakamaServerMod.UnitySdk.Tests
             var service = new ConfigService(client);
             var gameConfig = await service.GetGameConfigAsync();
             Assert.IsFalse(string.IsNullOrEmpty(gameConfig.vip));
-            Assert.IsTrue(gameConfig.vip.Contains("\"vip_monthly\""));
-            Assert.IsTrue(gameConfig.vip.Contains("\"svip_monthly\""));
+            Assert.IsTrue(gameConfig.vip.Contains("\"monthly_products\""));
+            Assert.IsTrue(gameConfig.vip.Contains("\"benefitPlanId\":\"vip\""));
+            Assert.IsTrue(gameConfig.vip.Contains("\"benefitPlanId\":\"svip\""));
         }
     }
 }

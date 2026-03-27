@@ -37,10 +37,7 @@ local function build_data(name)
         return config.shop
     end
     if name == "vip" then
-        return {
-            benefit_plans = config.benefit_plans,
-            iap_products = config.iap_products
-        }
+        return config.vip
     end
     return nil
 end

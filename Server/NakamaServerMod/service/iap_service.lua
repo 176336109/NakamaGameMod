@@ -148,6 +148,14 @@ function M.rpc_create_order(context, payload)
         })
     end
 
+    local amount = 100
+    if type(config.monthly_products_by_product_id) == "table" then
+        local monthly = config.monthly_products_by_product_id[product_id]
+        if type(monthly) == "table" and type(monthly.costAmount) == "number" then
+            amount = monthly.costAmount
+        end
+    end
+
     -- Call PayGateway to create order
     local url = config.paygateway_api_url .. "/v1/orders"
     local headers = {
@@ -158,7 +166,7 @@ function M.rpc_create_order(context, payload)
         app_id = "nakama_game",
         user_id = user_id,
         product_id = product_id,
-        amount = 100, -- In real world, look up price from config.iap_products
+        amount = amount,
         currency = "CNY",
         provider = provider,
         subject = "IAP Purchase: " .. product_id

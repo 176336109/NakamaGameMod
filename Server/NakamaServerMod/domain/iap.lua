@@ -33,7 +33,10 @@ function M.on_purchase_complete(context, purchase)
     local user_id = context.user_id
     local product_id = purchase.product_id
     
-    local product_config = config.iap_products[product_id]
+    local product_config = nil
+    if type(config.iap_products) == "table" then
+        product_config = config.iap_products[product_id]
+    end
     if not product_config and config.shop and config.shop.goods and config.shop.goods[product_id] then
         local goods = config.shop.goods[product_id]
         local is_iap_goods = goods.costType == "rmb" or goods.shopType == "crystal"
@@ -53,7 +56,7 @@ function M.on_purchase_complete(context, purchase)
     
     -- 发放奖励：按配置表 iap_products[product_id].rewards 进行道具/货币等增发
     -- ref：作为“幂等/对账”上下文，尽量带齐交易来源字段（backpack 模块可据此做审计或二次幂等）
-    if product_config.rewards then
+    if type(product_config.rewards) == "table" and #product_config.rewards > 0 then
         local ref = { product_id = product_id }
         if purchase.provider ~= nil then ref.provider = purchase.provider end
         if purchase.store ~= nil then ref.store = purchase.store end
@@ -86,23 +89,6 @@ function M.on_purchase_complete(context, purchase)
         end
     end
 
-    -- 订阅示例：duration_days 存在则按“当前时间 + 天数”计算到期并写入 storage
-    if product_config.duration_days then
-        -- 写入位置：collection=subscription, key=premium_status, user_id=当前用户
-        -- value 字段语义：expire_at=到期时间戳；active=是否激活
-        local sub_end = os.time() + (product_config.duration_days * 86400)
-        nk.storage_write({
-            {
-                collection = "subscription",
-                key = "premium_status",
-                user_id = user_id,
-                value = { expire_at = sub_end, active = true },
-                permission_read = 1,
-                permission_write = 0
-            }
-        })
-    end
-    
     -- 成功日志：用于确认已执行到发货末尾（包含 user_id 与 product_id，便于按人/商品检索）
     nk.logger_info("Purchase processed for user: " .. user_id .. ", Product: " .. product_id)
     return true

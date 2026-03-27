@@ -6,18 +6,14 @@ namespace NakamaServerMod.UnitySdk
     [Serializable]
     public class VipConfigDto
     {
-        public Dictionary<string, VipBenefitPlanDto> benefit_plans;
-        public Dictionary<string, VipIapProductDto> iap_products;
+        public List<VipBenefitPlanDto> benefit_plans;
+        public List<VipMonthlyProductDto> monthly_products;
     }
 
     [Serializable]
     public class VipBenefitPlanDto
     {
-        public string id;
-        public string name;
-        public string desc;
-        public string priceCurrency;
-        public int priceAmount;
+        public string benefitPlanId;
         public List<VipRewardItemDto> immediateItems;
         public List<VipRewardItemDto> dailyItems;
         public VipPrivilegesDto privileges;
@@ -37,11 +33,16 @@ namespace NakamaServerMod.UnitySdk
     }
 
     [Serializable]
-    public class VipIapProductDto
+    public class VipMonthlyProductDto
     {
-        public List<VipRewardItemDto> rewards;
-        public int duration_days;
-        public string benefit_plan_id;
+        public string productId;
+        public string itemId;
+        public string benefitPlanId;
+        public string name;
+        public string desc;
+        public string costType;
+        public int costAmount;
+        public int durationDays;
     }
 
     [Serializable]

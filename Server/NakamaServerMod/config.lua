@@ -165,42 +165,8 @@ M.gacha = {
     }
 }
 
--- 权益配置（月卡奖励、特权等）
-M.benefit_plans = {
-    ["vip_monthly"] = {
-        id = "vip_monthly",
-        immediateItems = { { id = "gem", count = 180 } },
-        dailyItems = { { id = "gem", count = 30 } },
-        privileges = {
-            reviveLimit = 4,
-            reviveNeedsAd = true,
-            sweepLimit = 5,
-            queueExtraEnabled = false,
-            magnetNeedsAd = false,
-            plunderBaseLimit = 1,
-            plunderAdLimit = 1,
-            svipBadgeEnabled = false
-        }
-    },
-    ["svip_monthly"] = {
-        id = "svip_monthly",
-        immediateItems = { { id = "gem", count = 300 } },
-        dailyItems = {
-            { id = "gem", count = 60 },
-            { id = "010300001",    count = 3 }
-        },
-        privileges = {
-            reviveLimit = 3,
-            reviveNeedsAd = false,
-            sweepLimit = 50,
-            queueExtraEnabled = true,
-            magnetNeedsAd = true,
-            plunderBaseLimit = 2,
-            plunderAdLimit = 1,
-            svipBadgeEnabled = true
-        }
-    }
-}
+-- 权益配置统一由 data/vip.json 加载，避免使用测试默认值。
+M.benefit_plans = {}
 
 -- 签到配置 (V1.1 - 7天循环)
 M.checkin = {
@@ -362,28 +328,8 @@ M.shop = {
     }
 }
 
--- 内购商品配置（SKU -> 奖励/时长）
-M.iap_products = {
-    ["gold_pack_1"] = {
-        rewards = { { id = "gold", count = 100 } }
-    },
-    ["com.game.gem_pack_1"] = {
-        rewards = { { id = "gem", count = 100 } }
-    },
-    ["com.game.gem_pack_2"] = {
-        rewards = { { id = "gem", count = 550 } }
-    },
-    ["com.game.monthly_card"] = {
-        rewards = { { id = "gem", count = 300 } },
-        duration_days = 30,
-        benefit_plan_id = "vip_monthly"
-    },
-    ["com.game.svip_monthly_card"] = {
-        rewards = { { id = "gem", count = 300 } },
-        duration_days = 30,
-        benefit_plan_id = "svip_monthly"
-    }
-}
+-- 商品配置统一由 data/vip.json 与 data/gift.json 构建。
+M.iap_products = {}
 
 local shop_json = load_json_file("shop.json")
 if shop_json == nil or type(shop_json.goods) ~= "table" or type(shop_json.refresh_cost) ~= "table" then
@@ -392,11 +338,35 @@ end
 M.shop = shop_json
 
 local vip_json = load_json_file("vip.json")
-if vip_json == nil or type(vip_json.benefit_plans) ~= "table" or type(vip_json.iap_products) ~= "table" then
+if vip_json == nil or type(vip_json.benefit_plans) ~= "table" or type(vip_json.monthly_products) ~= "table" then
     error("FAILED_TO_LOAD_VIP_JSON: vip.json not found/readable or invalid")
 end
-M.benefit_plans = vip_json.benefit_plans
-M.iap_products = vip_json.iap_products
+M.vip = vip_json
+M.monthly_products = vip_json.monthly_products
+M.monthly_products_by_product_id = {}
+M.benefit_plans = {}
+
+for _, plan in ipairs(vip_json.benefit_plans) do
+    if type(plan) == "table" and type(plan.benefitPlanId) == "string" and plan.benefitPlanId ~= "" then
+        M.benefit_plans[plan.benefitPlanId] = plan
+    end
+end
+
+M.iap_products = {}
+for _, product in ipairs(vip_json.monthly_products) do
+    if type(product) == "table" and type(product.productId) == "string" and product.productId ~= "" then
+        M.monthly_products_by_product_id[product.productId] = product
+        M.iap_products[product.productId] = {
+            duration_days = product.durationDays,
+            benefit_plan_id = product.benefitPlanId,
+            item_id = product.itemId,
+            cost_type = product.costType,
+            cost_amount = product.costAmount,
+            name = product.name,
+            desc = product.desc
+        }
+    end
+end
 
 local checkin_json = load_json_file("checkin.json")
 if checkin_json == nil or type(checkin_json.rewards) ~= "table" or type(checkin_json.makeup_cost) ~= "table" then

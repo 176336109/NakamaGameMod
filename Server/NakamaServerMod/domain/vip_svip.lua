@@ -14,7 +14,7 @@ vip_svip.lua
    - value: { type="time_limited", itemId=..., startAt=..., expireAt=..., benefitPlanId=... }
 
 2. 权益状态 (Storage: vip_subscription_state)
-   - key: "vip_monthly" / "svip_monthly" (对应 benefitPlanId)
+   - key: "vip" / "svip" (对应 benefitPlanId)
    - value: {
        instanceId = "...", 
        pendingClaimDays = 0, -- 当前可领取天数
@@ -57,8 +57,8 @@ end
 -- 常量定义
 local VIP_ITEM_ID = "item_vip_active"
 local SVIP_ITEM_ID = "item_svip_active"
-local VIP_PLAN_ID = "vip_monthly"
-local SVIP_PLAN_ID = "svip_monthly"
+local VIP_PLAN_ID = "vip"
+local SVIP_PLAN_ID = "svip"
 
 local MAX_CUMULATIVE_DAYS = 180
 local MAX_PENDING_DAYS = 3
