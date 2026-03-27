@@ -50,10 +50,10 @@ namespace NakamaServerMod.UnitySdk.Tests
             var service = new BackpackService(client);
 
             var grant = await service.GrantAsync(CreateGrantRequest("010300001", 3));
-            Assert.IsTrue(grant.success, grant.error?.message);
+            Assert.IsTrue(grant.success, grant.error);
 
             var items = await service.GetItemsAsync(new[] { "010300001" });
-            Assert.IsTrue(items.success, items.error?.message);
+            Assert.IsTrue(items.success, items.error);
             Assert.AreEqual(3, items.items[0].count);
         }
 
@@ -65,10 +65,10 @@ namespace NakamaServerMod.UnitySdk.Tests
             var service = new BackpackService(client);
 
             var first = await service.GrantAsync(CreateGrantRequest("020100001", 2));
-            Assert.IsTrue(first.success, first.error?.message);
+            Assert.IsTrue(first.success, first.error);
 
             var second = await service.GrantAsync(CreateGrantRequest("020100001", 5));
-            Assert.IsTrue(second.success, second.error?.message);
+            Assert.IsTrue(second.success, second.error);
 
             var items = await service.GetItemsAsync(new[] { "020100001" });
             Assert.AreEqual(7, items.items[0].count);
@@ -90,10 +90,10 @@ namespace NakamaServerMod.UnitySdk.Tests
             var expireAt = NowTs() + 3600;
 
             var grant = await service.GrantAsync(CreateGrantRequest("item_vip_active", 1, expireAt));
-            Assert.IsTrue(grant.success, grant.error?.message);
+            Assert.IsTrue(grant.success, grant.error);
 
             var list = await service.ListAsync();
-            Assert.IsTrue(list.success, list.error?.message);
+            Assert.IsTrue(list.success, list.error);
             var vip = list.items.FirstOrDefault(x => x.id == "item_vip_active");
             Assert.IsNotNull(vip);
             Assert.IsFalse(vip.stackable);
@@ -115,7 +115,7 @@ namespace NakamaServerMod.UnitySdk.Tests
                 items = new List<BackpackItem> { new BackpackItem { id = "010300001", count = 1 } }
             };
             var use = await service.UseAsync(useReq);
-            Assert.IsTrue(use.success, use.error?.message);
+            Assert.IsTrue(use.success, use.error);
 
             var items = await service.GetItemsAsync(new[] { "010300001" });
             Assert.AreEqual(4, items.items[0].count);
@@ -134,7 +134,7 @@ namespace NakamaServerMod.UnitySdk.Tests
                 source = "sdk_test_consume",
                 items = new List<BackpackItem> { new BackpackItem { id = "020200001", count = 1 } }
             });
-            Assert.IsTrue(consume.success, consume.error?.message);
+            Assert.IsTrue(consume.success, consume.error);
 
             var items = await service.GetItemsAsync(new[] { "020200001" });
             Assert.AreEqual(0, items.items[0].count);
@@ -156,7 +156,7 @@ namespace NakamaServerMod.UnitySdk.Tests
 
             await service.GrantAsync(CreateGrantRequest("item_vip_active", 1, NowTs() - 5));
             var cleanup = await service.CleanupAsync();
-            Assert.IsTrue(cleanup.success, cleanup.error?.message);
+            Assert.IsTrue(cleanup.success, cleanup.error);
             Assert.IsTrue(cleanup.result.cleaned);
 
             var items = await service.GetItemsAsync(new[] { "item_vip_active" });
@@ -174,9 +174,9 @@ namespace NakamaServerMod.UnitySdk.Tests
             var secondExpireAt = firstExpireAt + 7200;
 
             var first = await service.GrantAsync(CreateGrantRequest("item_vip_active", 1, firstExpireAt));
-            Assert.IsTrue(first.success, first.error?.message);
+            Assert.IsTrue(first.success, first.error);
             var second = await service.GrantAsync(CreateGrantRequest("item_vip_active", 1, secondExpireAt));
-            Assert.IsTrue(second.success, second.error?.message);
+            Assert.IsTrue(second.success, second.error);
 
             var list = await service.ListAsync();
             var vipItems = list.items.Where(x => x.id == "item_vip_active").ToList();
@@ -219,7 +219,7 @@ namespace NakamaServerMod.UnitySdk.Tests
             };
 
             var result = await service.GrantAsync(req);
-            Assert.IsTrue(result.success, result.error?.message);
+            Assert.IsTrue(result.success, result.error);
 
             var walletResponse = await GetWalletAsync(client);
             var wallet = walletResponse?.wallet ?? new Dictionary<string, long>();
@@ -241,8 +241,8 @@ namespace NakamaServerMod.UnitySdk.Tests
 
             var first = await service.GrantAsync(req);
             var second = await service.GrantAsync(req);
-            Assert.IsTrue(first.success, first.error?.message);
-            Assert.IsTrue(second.success, second.error?.message);
+            Assert.IsTrue(first.success, first.error);
+            Assert.IsTrue(second.success, second.error);
             Assert.IsTrue(second.result?.idempotent ?? false);
 
             var items = await service.GetItemsAsync(new[] { "020300001" });
@@ -257,7 +257,7 @@ namespace NakamaServerMod.UnitySdk.Tests
             var service = new BackpackService(client);
             var response = await service.GetItemDefsAsync();
 
-            Assert.IsTrue(response.success, response.error?.message);
+            Assert.IsTrue(response.success, response.error);
             Assert.IsNotNull(response.items);
             Assert.IsTrue(response.items.Count > 0);
 
@@ -273,13 +273,13 @@ namespace NakamaServerMod.UnitySdk.Tests
             var client = await CreateAuthenticatedClientAsync("背包_C14_获取背包全部物品");
             var service = new BackpackService(client);
             var grantItem = await service.GrantAsync(CreateGrantRequest("010300001", 2));
-            Assert.IsTrue(grantItem.success, grantItem.error?.message);
+            Assert.IsTrue(grantItem.success, grantItem.error);
             var grantVip = await service.GrantAsync(CreateGrantRequest("item_vip_active", 1, NowTs() + 3600));
-            Assert.IsTrue(grantVip.success, grantVip.error?.message);
+            Assert.IsTrue(grantVip.success, grantVip.error);
 
             var response = await service.GetAllInfoAsync(new InventoryAllInfoRequest { page_size = 100, limit = 100 });
 
-            Assert.IsTrue(response.success, response.error?.message);
+            Assert.IsTrue(response.success, response.error);
             Assert.IsNotNull(response.backpackItems);
             Assert.IsTrue(response.backpackItems.Any(x => x.id == "010300001"));
             Assert.IsTrue(response.backpackItems.Any(x => x.id == "item_vip_active"));
@@ -306,7 +306,7 @@ namespace NakamaServerMod.UnitySdk.Tests
 
             var response = await service.GetAllInfoAsync(new InventoryAllInfoRequest { page_size = 100, limit = 100, item_type = "special" });
 
-            Assert.IsTrue(response.success, response.error?.message);
+            Assert.IsTrue(response.success, response.error);
             Assert.IsNotNull(response.backpackItems);
             Assert.IsTrue(response.backpackItems.Count > 0);
             Assert.IsTrue(response.backpackItems.All(x => x.itemType == "special"));
@@ -445,8 +445,8 @@ namespace NakamaServerMod.UnitySdk.Tests
 
             var first = await service.GrantAsync(req);
             var second = await service.GrantAsync(req);
-            Assert.IsTrue(first.success, first.error?.message);
-            Assert.IsTrue(second.success, second.error?.message);
+            Assert.IsTrue(first.success, first.error);
+            Assert.IsTrue(second.success, second.error);
             Assert.IsTrue(second.result?.idempotent ?? false);
 
             var items = await service.GetItemsAsync(new[] { "item_vip_active" });
@@ -479,7 +479,7 @@ namespace NakamaServerMod.UnitySdk.Tests
 
             var grant = await service.GrantAsync(CreateGrantRequest("rewardRef_random_ship_pool", 1));
             Assert.IsFalse(grant.success);
-            Assert.AreEqual("GRANT_FAILED", grant.error.code);
+            Assert.AreEqual(600005, grant.error_code);
         }
 
         // 用例说明：错误别名/名称应被拒绝入包。
@@ -491,7 +491,7 @@ namespace NakamaServerMod.UnitySdk.Tests
 
             var grant = await service.GrantAsync(CreateGrantRequest("时钟沙漏", 1));
             Assert.IsFalse(grant.success);
-            Assert.AreEqual("GRANT_FAILED", grant.error.code);
+            Assert.AreEqual(600005, grant.error_code);
         }
 
         // 用例说明：变更后背包版本号应前进。

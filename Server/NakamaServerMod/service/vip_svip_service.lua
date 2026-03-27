@@ -1,9 +1,22 @@
 local nk = require("nakama")
+local error_codes = require("domain.error_codes")
+local response = require("service.response")
 
 local M = {}
 local vip_domain = nil
 local iap_domain = nil
 local iap_service = nil
+
+local DOMAIN_ERROR_MAP = {
+    ["Invalid benefit plan"] = "VIP_PLAN_INVALID",
+    ["Exceeds maximum cumulative days"] = "VIP_EXCEEDS_MAX_CUMULATIVE_DAYS",
+    ["Subscription not active or expired"] = "VIP_NOT_ACTIVE",
+    ["State not found"] = "VIP_STATE_NOT_FOUND",
+    ["No pending rewards"] = "VIP_NO_PENDING_REWARD",
+    ["No rewards"] = "VIP_NO_PENDING_REWARD",
+    ["item gateway not configured"] = "COMMON_INTERNAL_ERROR",
+    ["Invalid plan_id. Must be 'vip_monthly' or 'svip_monthly'"] = "VIP_INVALID_PLAN_ID"
+}
 
 function M.wire_item_gateway(backpack, vip_svip)
     if type(vip_svip) ~= "table" or type(vip_svip.set_item_gateway) ~= "function" then
@@ -52,14 +65,26 @@ local function decode_payload(payload)
 end
 
 local function service_not_wired()
-    return nk.json_encode({ error = "VIP service not wired" })
+    local code, message = error_codes.resolve("VIP_SERVICE_NOT_WIRED", "VIP service not wired")
+    return response.fail(code, message)
+end
+
+local function fail_by_key(key, fallback_message)
+    local code, message = error_codes.resolve(key, fallback_message)
+    return response.fail(code, message)
+end
+
+local function fail_by_domain_error(err, default_key)
+    local text = tostring(err or "")
+    local key = DOMAIN_ERROR_MAP[text] or default_key or "COMMON_INTERNAL_ERROR"
+    return fail_by_key(key, text)
 end
 
 function M.rpc_purchase_vip(context, payload)
     if not vip_domain then return service_not_wired() end
     local req = decode_payload(payload)
     if not iap_service or type(iap_service.rpc_create_order) ~= "function" then
-        return nk.json_encode({ error = "IAP service not wired" })
+        return fail_by_key("IAP_SERVICE_NOT_WIRED", "IAP service not wired")
     end
     local provider = req.provider or "mock"
     local order_payload = nk.json_encode({
@@ -69,19 +94,23 @@ function M.rpc_purchase_vip(context, payload)
     local order_raw = iap_service.rpc_create_order(context, order_payload)
     local ok_decode, order_result = pcall(nk.json_decode, order_raw or "")
     if not ok_decode or type(order_result) ~= "table" then
-        return nk.json_encode({ success = false, error = "Create order failed" })
+        return fail_by_key("IAP_CREATE_ORDER_FAILED", "Create order failed")
     end
     if order_result.success == false then
-        return nk.json_encode({ success = false, error = order_result.error or "Create order failed" })
+        local err_message = order_result.error
+        if type(err_message) == "table" then
+            err_message = err_message.message
+        end
+        return fail_by_key("IAP_CREATE_ORDER_FAILED", tostring(err_message or "Create order failed"))
     end
-    return nk.json_encode({ success = true, payment_required = true, order = order_result })
+    return response.ok({ payment_required = true, order = order_result })
 end
 
 function M.rpc_purchase_svip(context, payload)
     if not vip_domain then return service_not_wired() end
     local req = decode_payload(payload)
     if not iap_service or type(iap_service.rpc_create_order) ~= "function" then
-        return nk.json_encode({ error = "IAP service not wired" })
+        return fail_by_key("IAP_SERVICE_NOT_WIRED", "IAP service not wired")
     end
     local provider = req.provider or "mock"
     local order_payload = nk.json_encode({
@@ -91,33 +120,37 @@ function M.rpc_purchase_svip(context, payload)
     local order_raw = iap_service.rpc_create_order(context, order_payload)
     local ok_decode, order_result = pcall(nk.json_decode, order_raw or "")
     if not ok_decode or type(order_result) ~= "table" then
-        return nk.json_encode({ success = false, error = "Create order failed" })
+        return fail_by_key("IAP_CREATE_ORDER_FAILED", "Create order failed")
     end
     if order_result.success == false then
-        return nk.json_encode({ success = false, error = order_result.error or "Create order failed" })
+        local err_message = order_result.error
+        if type(err_message) == "table" then
+            err_message = err_message.message
+        end
+        return fail_by_key("IAP_CREATE_ORDER_FAILED", tostring(err_message or "Create order failed"))
     end
-    return nk.json_encode({ success = true, payment_required = true, order = order_result })
+    return response.ok({ payment_required = true, order = order_result })
 end
 
 function M.rpc_claim_vip_daily(context, payload)
     if not vip_domain then return service_not_wired() end
     local ok, err = vip_domain.claim_vip_daily(context, context.user_id)
-    if not ok then return nk.json_encode({ error = err }) end
-    return nk.json_encode({ success = true })
+    if not ok then return fail_by_domain_error(err, "COMMON_INTERNAL_ERROR") end
+    return response.ok()
 end
 
 function M.rpc_claim_svip_daily(context, payload)
     if not vip_domain then return service_not_wired() end
     local ok, err = vip_domain.claim_svip_daily(context, context.user_id)
-    if not ok then return nk.json_encode({ error = err }) end
-    return nk.json_encode({ success = true })
+    if not ok then return fail_by_domain_error(err, "COMMON_INTERNAL_ERROR") end
+    return response.ok()
 end
 
 function M.rpc_claim_all_daily(context, payload)
     if not vip_domain then return service_not_wired() end
     local ok, err = vip_domain.claim_all_daily(context, context.user_id)
-    if not ok then return nk.json_encode({ error = err }) end
-    return nk.json_encode({ success = true })
+    if not ok then return fail_by_domain_error(err, "VIP_NO_PENDING_REWARD") end
+    return response.ok()
 end
 
 function M.rpc_get_vip_status(context, payload)
@@ -170,16 +203,6 @@ end
 function M.rpc_check_queue_permission(context, payload)
     if not vip_domain then return service_not_wired() end
     return nk.json_encode(vip_domain.check_queue_permission(context, context.user_id))
-end
-
-function M.rpc_debug_simulate_purchase(context, payload)
-    if not vip_domain then return service_not_wired() end
-    local req = decode_payload(payload)
-    local ok, result = vip_domain.debug_simulate_purchase(context, context.user_id, req.plan_id)
-    if not ok then
-        return nk.json_encode({ error = result })
-    end
-    return nk.json_encode(result)
 end
 
 return M

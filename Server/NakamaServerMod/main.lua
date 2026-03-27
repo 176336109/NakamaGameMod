@@ -71,7 +71,6 @@ nk.register_rpc(vip_svip_service.rpc_check_magnet_permission, "check_magnet_perm
 nk.register_rpc(vip_svip_service.rpc_check_plunder_permission, "check_plunder_permission")
 nk.register_rpc(vip_svip_service.rpc_record_plunder_usage, "record_plunder_usage")
 nk.register_rpc(vip_svip_service.rpc_check_queue_permission, "check_queue_permission")
-nk.register_rpc(vip_svip_service.rpc_debug_simulate_purchase, "debug_simulate_purchase")
 
 -- 5) Shop RPCs
 nk.register_rpc(shop_service.rpc_shop_get_state, "shop_get_state")

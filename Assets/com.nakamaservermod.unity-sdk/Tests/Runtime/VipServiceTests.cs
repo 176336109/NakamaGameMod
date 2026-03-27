@@ -91,13 +91,6 @@ namespace NakamaServerMod.UnitySdk.Tests
         private async Task CompleteVipPurchaseAsync(GameClient client, VipService vipService)
         {
             var result = await vipService.PurchaseVipAsync();
-            if (!result.success && (result.error ?? string.Empty).Contains("Failed to create order"))
-            {
-                var fallback = await vipService.DebugSimulatePurchaseAsync("vip_monthly");
-                Assert.IsTrue(fallback.success, fallback.error);
-                return;
-            }
-
             Assert.IsTrue(result.success, result.error);
             if (result.payment_required)
             {
@@ -115,13 +108,6 @@ namespace NakamaServerMod.UnitySdk.Tests
         private async Task CompleteSvipPurchaseAsync(GameClient client, VipService vipService)
         {
             var result = await vipService.PurchaseSvipAsync();
-            if (!result.success && (result.error ?? string.Empty).Contains("Failed to create order"))
-            {
-                var fallback = await vipService.DebugSimulatePurchaseAsync("svip_monthly");
-                Assert.IsTrue(fallback.success, fallback.error);
-                return;
-            }
-
             Assert.IsTrue(result.success, result.error);
             if (result.payment_required)
             {
@@ -507,28 +493,5 @@ namespace NakamaServerMod.UnitySdk.Tests
             Assert.AreEqual(0, afterAd.ad_remaining);
         }
 
-        [Test]
-        public async Task TestDebugSimulatePurchase()
-        {
-            var client = await CreateAuthenticatedClientAsync("模拟IAP购买测试");
-            var vipService = new VipService(client);
-
-            var vipResult = await vipService.DebugSimulatePurchaseAsync("vip_monthly");
-            Assert.IsNotNull(vipResult);
-            Assert.IsTrue(vipResult.success);
-            Assert.IsNotNull(vipResult.item_data);
-            Assert.AreEqual("item_vip_active", vipResult.item_data.itemId);
-
-            var svipResult = await vipService.DebugSimulatePurchaseAsync("svip_monthly");
-            Assert.IsNotNull(svipResult);
-            Assert.IsTrue(svipResult.success);
-            Assert.IsNotNull(svipResult.item_data);
-            Assert.AreEqual("item_svip_active", svipResult.item_data.itemId);
-
-            var status = await vipService.GetVipStatusAsync();
-            Assert.IsNotNull(status);
-            Assert.IsTrue(status.vip_active);
-            Assert.IsTrue(status.svip_active);
-        }
     }
 }
