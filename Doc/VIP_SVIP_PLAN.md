@@ -187,17 +187,23 @@
   usable: false,
   startAt: "服务器记录的购买生效时间",
   expireAt: "startAt + 30天",
-  benefitPlanId: "vip_monthly" // 或 "svip_monthly"
+  benefitPlanId: "vip" // 或 "svip"（由商品配置映射，不固定写死）
 }
 ```
 
-月卡奖励配置不直接写进权益实例，而是通过 `benefitPlanId` 关联到独立的 `rewardConfig` 对象：
+月卡商品配置独立维护在 `monthly_products` 中，通过 `productId` 下单并按 `benefitPlanId` 绑定权益配置：
+
+- `productId`：商品唯一标识（可自定义，不强制 `com.game.*` 形式）
+- `itemId`：生成的权益道具ID（如 `item_vip_active` / `item_svip_active`）
+- `benefitPlanId`：关联权益配置ID（如 `vip` / `svip`）
+- `costType` / `costAmount`：支付类型与金额（当前 `costType=rmb`）
+- `durationDays`：权益时长（用于运行时计算 `expireAt=startAt+durationDays`）
+
+月卡奖励配置不直接写进权益实例，而是通过 `benefitPlanId` 关联到独立的 `benefitPlanConfig` 对象：
 
 ```javascript
-rewardConfig {
-  id: "vip_monthly", // 或 "svip_monthly"
-  priceCurrency: "rmb",
-  priceAmount: 18,
+benefitPlanConfig {
+  benefitPlanId: "vip", // 或 "svip"
   immediateItems: [{ itemId: "2", count: 180 }],
   dailyItems: [{ itemId: "2", count: 30 }],
   privileges: {
@@ -213,7 +219,7 @@ rewardConfig {
 }
 ```
 
-SVIP对应的 `benefitPlanId=svip_monthly`，其 `rewardConfig` 内容为：`priceCurrency="rmb"`、`priceAmount=30`、立即奖励 `2 x300`，每日奖励 `2 x60 + 010300001 x3`，且 `privileges.queueExtraEnabled=true`。
+SVIP对应的 `benefitPlanId=svip`，其 `benefitPlanConfig` 内容为：立即奖励 `2 x300`，每日奖励 `2 x60 + 010300001 x3`，且 `privileges.queueExtraEnabled=true`；价格信息由 `monthly_products` 提供。
 
 ### 状态管理规则
 #### VIP状态管理
@@ -311,7 +317,7 @@ SVIP对应的 `benefitPlanId=svip_monthly`，其 `rewardConfig` 内容为：`pri
 | `itemId` | 物品类型ID |
 | `startAt` | 激活时间 |
 | `expireAt` | 过期时间 |
-| `benefitPlanId` | 权益配置ID，如 `vip_monthly` / `svip_monthly` |
+| `benefitPlanId` | 权益配置ID，如 `vip` / `svip`（与商品配置关联） |
 
 说明：
 - 权益实例对象只表达“资格”和“时效”
@@ -320,7 +326,7 @@ SVIP对应的 `benefitPlanId=svip_monthly`，其 `rewardConfig` 内容为：`pri
 - 是否生效只看 `expireAt > 当前时间`，不再单独维护 `status`
 - 不再保存奖励累计字段
 - 不再保存玩法日切计数字段
-- 不再直接保存 `rewardConfig`
+- 不再直接保存 `benefitPlanConfig`
 
 #### 2.3 权益状态对象
 
@@ -336,20 +342,20 @@ SVIP对应的 `benefitPlanId=svip_monthly`，其 `rewardConfig` 内容为：`pri
 - 激活成功时，`pendingClaimDays` 立即加1
 - 每日00:00刷新时，若权益仍有效，则 `pendingClaimDays` 加1，最大累计到3
 - 领取成功后，`pendingClaimDays` 减1
-- `queueExtraEnabled` 由对应 `rewardConfig.privileges` 投影到玩家状态中，便于业务模块直接读取
+- `queueExtraEnabled` 由对应 `benefitPlanConfig.privileges` 投影到玩家状态中，便于业务模块直接读取
 - `queueExtraEnabled` 是否真正生效仍以关联权益实例未过期为前提
 
-#### 2.4 权益配置对象（rewardConfig）
+#### 2.4 权益配置对象（benefitPlanConfig）
 
 | 字段 | 含义 |
 |------|------|
-| `id` | 配置ID，与 `benefitPlanId` 对应 |
+| `benefitPlanId` | 配置ID，与权益实例中的 `benefitPlanId` 对应 |
 | `immediateItems` | 激活立即发放的物品列表 |
 | `dailyItems` | 每次领取每日奖励时发放的物品列表 |
 | `privileges` | 特权配置，如复活次数、扫荡上限、`queueExtraEnabled` 等 |
 
 说明：
-- `rewardConfig` 是配置实例，不随玩家购买复制进背包
+- `benefitPlanConfig` 是配置实例，不随玩家购买复制进背包
 - 权益实例只保存 `benefitPlanId`，运行时按该ID读取配置
 - `immediateItems`、`dailyItems` 中每一项都用 `count` 表示本次应发数量
 - 需要热更的奖励和特权都放在这里维护
@@ -375,11 +381,11 @@ SVIP对应的 `benefitPlanId=svip_monthly`，其 `rewardConfig` 内容为：`pri
 |--------|----------|
 | VIP生效 | 存在 `expireAt > 当前时间` 的 `item_vip_active` 权益实例 |
 | SVIP生效 | 存在 `expireAt > 当前时间` 的 `item_svip_active` 权益实例 |
-| 配置来源 | 奖励与特权配置通过权益实例上的 `benefitPlanId` 读取对应 `rewardConfig` |
+| 配置来源 | 奖励与特权配置通过权益实例上的 `benefitPlanId` 读取对应 `benefitPlanConfig` |
 | 特权叠加 | 两个权益实例同时有效时，奖励累加；复活次数取更高值，广告要求取更优值；其他功能取最优或并集 |
 | 激活当日奖励 | 激活成功时，对应权益状态对象的 `pendingClaimDays` 立即加1，玩家需手动领取当天日奖励 |
 | 每日奖励 | 每日00:00为有效权益实例对应的权益状态对象执行累计；`pendingClaimDays` 最大累计到3；不生成任何奖励包物品 |
-| 奖励领取 | 领取时先校验权益实例仍有效，再校验权益状态对象 `pendingClaimDays>0`；成功后扣减1天，并按 `benefitPlanId` 对应 `rewardConfig` 发放物品 |
+| 奖励领取 | 领取时先校验权益实例仍有效，再校验权益状态对象 `pendingClaimDays>0`；成功后扣减1天，并按 `benefitPlanId` 对应 `benefitPlanConfig` 发放物品 |
 | 到期后领取 | 权益实例过期后，即使权益状态对象 `pendingClaimDays>0` 也不可继续领取 |
 | 复活次数 | 从玩法日切状态对象读取 `reviveUsed`；上限由当前权益组合判定：免费3次，VIP4次，SVIP3次，VIP+SVIP4次 |
 | 复活广告 | 从玩法日切状态对象读取 `reviveAdUsed`；是否需要广告由当前权益组合判定：免费和VIP需广告，SVIP与VIP+SVIP免广告 |
@@ -397,8 +403,8 @@ SVIP对应的 `benefitPlanId=svip_monthly`，其 `rewardConfig` 内容为：`pri
 
 | 用例ID | 场景 | 前置数据 | 触发 | 预期数据 |
 |--------|------|----------|------|----------|
-| C01 | 购买VIP后立即生效 | 不存在未过期 `item_vip_active`；`2=D0` | 购买VIP月卡 | 新增 `item_vip_active` 权益实例 x1；`instanceId=I1`；`startAt=当前时间`；`expireAt=startAt+30天`；`benefitPlanId=vip_monthly`；新增对应权益状态对象：`instanceId=I1`，`pendingClaimDays=1`，`queueExtraEnabled=false`；`2=D0+180`；VIP权益立即生效 |
-| C02 | 购买SVIP后立即生效 | 不存在未过期 `item_svip_active`；`2=D0` | 购买SVIP月卡 | 新增 `item_svip_active` 权益实例 x1；`instanceId=I2`；`startAt=当前时间`；`expireAt=startAt+30天`；`benefitPlanId=svip_monthly`；新增对应权益状态对象：`instanceId=I2`，`pendingClaimDays=1`，`queueExtraEnabled=true`；`2=D0+300`；SVIP权益立即生效 |
+| C01 | 购买VIP后立即生效 | 不存在未过期 `item_vip_active`；`2=D0` | 购买VIP月卡 | 新增 `item_vip_active` 权益实例 x1；`instanceId=I1`；`startAt=当前时间`；`expireAt=startAt+30天`；`benefitPlanId=vip`；新增对应权益状态对象：`instanceId=I1`，`pendingClaimDays=1`，`queueExtraEnabled=false`；`2=D0+180`；VIP权益立即生效 |
+| C02 | 购买SVIP后立即生效 | 不存在未过期 `item_svip_active`；`2=D0` | 购买SVIP月卡 | 新增 `item_svip_active` 权益实例 x1；`instanceId=I2`；`startAt=当前时间`；`expireAt=startAt+30天`；`benefitPlanId=svip`；新增对应权益状态对象：`instanceId=I2`，`pendingClaimDays=1`，`queueExtraEnabled=true`；`2=D0+300`；SVIP权益立即生效 |
 | C03 | 已有VIP时购买SVIP | 已存在未过期 `item_vip_active`；不存在未过期 `item_svip_active` | 购买SVIP月卡 | `item_vip_active` 保持不变；新增 `item_svip_active` 权益实例与其对应权益状态对象；账号同时拥有两类权益；奖励与特权按叠加规则生效 |
 | C04 | VIP续费延长有效期 | 已存在未过期 `item_vip_active` 权益实例；原 `expireAt=T1` | 再次购买VIP月卡 | 同一个VIP权益实例继续有效；`expireAt=T1+30天`；若累积未超过180天则续费成功 |
 | C05 | SVIP续费延长有效期 | 已存在未过期 `item_svip_active` 权益实例；原 `expireAt=T1` | 再次购买SVIP月卡 | 同一个SVIP权益实例继续有效；`expireAt=T1+30天`；若累积未超过180天则续费成功 |

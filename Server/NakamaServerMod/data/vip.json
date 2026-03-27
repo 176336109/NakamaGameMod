@@ -1,11 +1,7 @@
 {
-    "benefit_plans": {
-        "vip_monthly": {
-            "id": "vip_monthly",
-            "name": "VIP月卡",
-            "desc": "激活后获得VIP权益与每日奖励",
-            "priceCurrency": "rmb",
-            "priceAmount": 18,
+    "benefit_plans": [
+        {
+            "benefitPlanId": "vip",
             "immediateItems": [ { "id": "gem", "count": 180 } ],
             "dailyItems": [ { "id": "gem", "count": 30 } ],
             "privileges": {
@@ -19,12 +15,8 @@
                 "svipBadgeEnabled": false
             }
         },
-        "svip_monthly": {
-            "id": "svip_monthly",
-            "name": "SVIP月卡",
-            "desc": "激活后获得SVIP权益与每日奖励",
-            "priceCurrency": "rmb",
-            "priceAmount": 30,
+        {
+            "benefitPlanId": "svip",
             "immediateItems": [ { "id": "gem", "count": 300 } ],
             "dailyItems": [
                 { "id": "gem", "count": 60 },
@@ -41,26 +33,27 @@
                 "svipBadgeEnabled": true
             }
         }
-    },
-    "iap_products": {
-        "gold_pack_1": {
-            "rewards": [ { "id": "gold", "count": 100 } ]
+    ],
+    "monthly_products": [
+        {
+            "productId": "vip",
+            "itemId": "item_vip_active",
+            "benefitPlanId": "vip",
+            "name": "VIP月卡",
+            "desc": "激活后获得VIP权益与每日奖励",
+            "costType": "rmb",
+            "costAmount": 18,
+            "durationDays": 30
         },
-        "com.game.gem_pack_1": {
-            "rewards": [ { "id": "gem", "count": 100 } ]
-        },
-        "com.game.gem_pack_2": {
-            "rewards": [ { "id": "gem", "count": 550 } ]
-        },
-        "com.game.monthly_card": {
-            "rewards": [ { "id": "gem", "count": 300 } ],
-            "duration_days": 30,
-            "benefit_plan_id": "vip_monthly"
-        },
-        "com.game.svip_monthly_card": {
-            "rewards": [ { "id": "gem", "count": 300 } ],
-            "duration_days": 30,
-            "benefit_plan_id": "svip_monthly"
+        {
+            "productId": "svip",
+            "itemId": "item_svip_active",
+            "benefitPlanId": "svip",
+            "name": "SVIP月卡",
+            "desc": "激活后获得SVIP权益与每日奖励",
+            "costType": "rmb",
+            "costAmount": 30,
+            "durationDays": 30
         }
-    }
+    ]
 }
