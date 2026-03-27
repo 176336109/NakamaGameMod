@@ -196,6 +196,8 @@
 ```javascript
 rewardConfig {
   id: "vip_monthly", // 或 "svip_monthly"
+  priceCurrency: "rmb",
+  priceAmount: 18,
   immediateItems: [{ itemId: "2", count: 180 }],
   dailyItems: [{ itemId: "2", count: 30 }],
   privileges: {
@@ -211,7 +213,7 @@ rewardConfig {
 }
 ```
 
-SVIP对应的 `benefitPlanId=svip_monthly`，其 `rewardConfig` 内容为：立即奖励 `2 x300`，每日奖励 `2 x60 + 010300001 x3`，且 `privileges.queueExtraEnabled=true`。
+SVIP对应的 `benefitPlanId=svip_monthly`，其 `rewardConfig` 内容为：`priceCurrency="rmb"`、`priceAmount=30`、立即奖励 `2 x300`，每日奖励 `2 x60 + 010300001 x3`，且 `privileges.queueExtraEnabled=true`。
 
 ### 状态管理规则
 #### VIP状态管理

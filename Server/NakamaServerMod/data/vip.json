@@ -4,6 +4,8 @@
             "id": "vip_monthly",
             "name": "VIP月卡",
             "desc": "激活后获得VIP权益与每日奖励",
+            "priceCurrency": "rmb",
+            "priceAmount": 18,
             "immediateItems": [ { "id": "gem", "count": 180 } ],
             "dailyItems": [ { "id": "gem", "count": 30 } ],
             "privileges": {
@@ -21,6 +23,8 @@
             "id": "svip_monthly",
             "name": "SVIP月卡",
             "desc": "激活后获得SVIP权益与每日奖励",
+            "priceCurrency": "rmb",
+            "priceAmount": 30,
             "immediateItems": [ { "id": "gem", "count": 300 } ],
             "dailyItems": [
                 { "id": "gem", "count": 60 },

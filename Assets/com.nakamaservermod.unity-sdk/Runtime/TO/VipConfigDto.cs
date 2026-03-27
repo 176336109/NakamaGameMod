@@ -16,6 +16,8 @@ namespace NakamaServerMod.UnitySdk
         public string id;
         public string name;
         public string desc;
+        public string priceCurrency;
+        public int priceAmount;
         public List<VipRewardItemDto> immediateItems;
         public List<VipRewardItemDto> dailyItems;
         public VipPrivilegesDto privileges;

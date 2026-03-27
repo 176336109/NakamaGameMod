@@ -7,3 +7,4 @@
 | `gameConfig.items` | `ItemsConfigDto` |
 | `gameConfig.shop` | `ShopConfigDto` |
 | `gameConfig.vip` | `VipConfigDto` |
+
