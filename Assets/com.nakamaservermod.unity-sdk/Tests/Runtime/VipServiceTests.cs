@@ -90,7 +90,7 @@ namespace NakamaServerMod.UnitySdk.Tests
 
         private async Task CompleteVipPurchaseAsync(GameClient client, VipService vipService)
         {
-            var result = await vipService.PurchaseVipAsync();
+            var result = await vipService.PurchaseByProductIdAsync("vip");
             Assert.IsTrue(result.success, result.error);
             if (result.payment_required)
             {
@@ -107,7 +107,7 @@ namespace NakamaServerMod.UnitySdk.Tests
 
         private async Task CompleteSvipPurchaseAsync(GameClient client, VipService vipService)
         {
-            var result = await vipService.PurchaseSvipAsync();
+            var result = await vipService.PurchaseByProductIdAsync("svip");
             Assert.IsTrue(result.success, result.error);
             if (result.payment_required)
             {

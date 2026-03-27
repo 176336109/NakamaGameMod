@@ -4,6 +4,16 @@ using System.Collections.Generic;
 namespace NakamaServerMod.UnitySdk
 {
     /// <summary>
+    /// 创建月卡订单请求
+    /// </summary>
+    [Serializable]
+    public class VipPurchaseRequest
+    {
+        public string product_id;
+        public string provider;
+    }
+
+    /// <summary>
     /// 记录复活使用请求
     /// </summary>
     [Serializable]
