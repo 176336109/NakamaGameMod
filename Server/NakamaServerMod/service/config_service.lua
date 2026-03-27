@@ -5,31 +5,10 @@ local response = require("service.response")
 
 local M = {}
 
-local SUPPORTED = {
-    checkin = true,
-    gift = true,
-    items = true,
-    shop = true,
-    vip = true
-}
-
 -- 统一按错误码键构造失败响应。
 local function fail_by_key(key, fallback_message)
     local code, message = error_codes.resolve(key, fallback_message)
     return response.fail(code, message)
-end
-
--- 解析 RPC 入参，解析失败时返回空表以便走默认分支。
-local function decode_payload(payload)
-    if payload and payload ~= "" then
-        local ok, req = pcall(function()
-            return nk.json_decode(payload)
-        end)
-        if ok and type(req) == "table" then
-            return req
-        end
-    end
-    return {}
 end
 
 -- 基于 UTF-8 字节流计算 rolling hash，供客户端比对篡改。
@@ -66,41 +45,33 @@ local function build_data(name)
     return nil
 end
 
--- 统一配置读取入口：支持按名称读取，或空 name 返回全部配置。
+-- 统一配置读取入口：仅返回全量配置。
 function M.rpc_config_get(context, payload)
-    local req = decode_payload(payload)
-    local name = req.name
-    if name == nil or name == "" then
-        local all = {
-            checkin = build_data("checkin"),
-            gift = build_data("gift"),
-            items = build_data("items"),
-            shop = build_data("shop"),
-            vip = build_data("vip")
-        }
-        local json = nk.json_encode(all)
-        return response.ok({
-            name = "all",
-            json = json,
-            hash = calc_hash(json),
-            config_id = "all",
-            content_length = string.len(json)
-        })
-    end
-    if type(name) ~= "string" or not SUPPORTED[name] then
-        return fail_by_key("COMMON_INVALID_PARAM", "Unsupported config name")
-    end
-    local data = build_data(name)
-    if type(data) ~= "table" then
+    local all = {
+        checkin = build_data("checkin"),
+        gift = build_data("gift"),
+        items = build_data("items"),
+        shop = build_data("shop"),
+        vip = build_data("vip")
+    }
+    if type(all.checkin) ~= "table" or type(all.gift) ~= "table" or type(all.items) ~= "table" or type(all.shop) ~= "table" or type(all.vip) ~= "table" then
         return fail_by_key("COMMON_INTERNAL_ERROR", "Config data unavailable")
     end
-    local json = nk.json_encode(data)
+    local json = nk.json_encode(all)
+    local game_config = {
+        checkin = nk.json_encode(all.checkin),
+        gift = nk.json_encode(all.gift),
+        items = nk.json_encode(all.items),
+        shop = nk.json_encode(all.shop),
+        vip = nk.json_encode(all.vip)
+    }
     return response.ok({
-        name = name,
+        name = "all",
         json = json,
         hash = calc_hash(json),
-        config_id = name,
-        content_length = string.len(json)
+        config_id = "all",
+        content_length = string.len(json),
+        game_config = game_config
     })
 end
 
