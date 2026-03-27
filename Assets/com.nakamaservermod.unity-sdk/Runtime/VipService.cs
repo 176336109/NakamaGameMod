@@ -19,12 +19,32 @@ namespace NakamaServerMod.UnitySdk
         }
 
         /// <summary>
+        /// 按商品ID创建月卡订单（推荐）
+        /// </summary>
+        /// <param name="productId">商品ID，如 vip/svip</param>
+        /// <param name="provider">支付渠道，默认mock</param>
+        /// <returns>物品数据响应</returns>
+        public Task<ItemDataResponse> PurchaseByProductIdAsync(string productId, string provider = "mock")
+        {
+            if (string.IsNullOrWhiteSpace(productId))
+            {
+                throw new ArgumentException("productId is required.", nameof(productId));
+            }
+            var request = new VipPurchaseRequest
+            {
+                product_id = productId,
+                provider = string.IsNullOrWhiteSpace(provider) ? "mock" : provider
+            };
+            return _client.RpcAsync<VipPurchaseRequest, ItemDataResponse>("purchase_vip", request);
+        }
+
+        /// <summary>
         /// 购买VIP月卡
         /// </summary>
         /// <returns>物品数据响应</returns>
         public Task<ItemDataResponse> PurchaseVipAsync()
         {
-            return _client.RpcAsync<string, ItemDataResponse>("purchase_vip", "{}");
+            return PurchaseByProductIdAsync("vip");
         }
 
         /// <summary>
@@ -33,7 +53,7 @@ namespace NakamaServerMod.UnitySdk
         /// <returns>物品数据响应</returns>
         public Task<ItemDataResponse> PurchaseSvipAsync()
         {
-            return _client.RpcAsync<string, ItemDataResponse>("purchase_svip", "{}");
+            return PurchaseByProductIdAsync("svip");
         }
 
         /// <summary>
