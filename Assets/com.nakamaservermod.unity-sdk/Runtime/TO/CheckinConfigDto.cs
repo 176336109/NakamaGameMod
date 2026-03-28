@@ -6,8 +6,15 @@ namespace NakamaServerMod.UnitySdk
     [Serializable]
     public class CheckinConfigDto
     {
-        public Dictionary<string, List<CheckinRewardItemDto>> rewards;
+        public List<CheckinDayRewardDto> rewards;
         public CheckinCostDto makeup_cost;
+    }
+
+    [Serializable]
+    public class CheckinDayRewardDto
+    {
+        public int dayIndex;
+        public List<CheckinRewardItemDto> rewardItems;
     }
 
     [Serializable]

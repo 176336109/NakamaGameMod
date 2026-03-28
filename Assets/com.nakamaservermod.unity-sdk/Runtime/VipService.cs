@@ -39,24 +39,6 @@ namespace NakamaServerMod.UnitySdk
         }
 
         /// <summary>
-        /// 购买VIP月卡
-        /// </summary>
-        /// <returns>物品数据响应</returns>
-        public Task<ItemDataResponse> PurchaseVipAsync()
-        {
-            return PurchaseByProductIdAsync("vip");
-        }
-
-        /// <summary>
-        /// 购买SVIP月卡
-        /// </summary>
-        /// <returns>物品数据响应</returns>
-        public Task<ItemDataResponse> PurchaseSvipAsync()
-        {
-            return PurchaseByProductIdAsync("svip");
-        }
-
-        /// <summary>
         /// 领取VIP每日奖励
         /// </summary>
         /// <returns>成功响应</returns>

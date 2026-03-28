@@ -216,7 +216,7 @@ function M.get_state_data(user_id)
         local progress = compute_limit_progress(cfg, limit_state[id], snapshot.snapshotId, today_str, week_key)
         item.progress = progress
         response.limitProgress[id] = progress
-        if cfg.shopType == "special" and cfg.displayMode == "fixed" then
+        if cfg.shopType == "special" and cfg.displayMode == "fix" then
             table.insert(response.fixedItems, item)
         elseif cfg.shopType == "gold" then
             table.insert(response.goldItems, item)
