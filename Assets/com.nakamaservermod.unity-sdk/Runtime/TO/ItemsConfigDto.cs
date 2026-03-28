@@ -6,13 +6,25 @@ namespace NakamaServerMod.UnitySdk
     [Serializable]
     public class ItemsConfigDto
     {
-        public Dictionary<string, ItemConfigDto> items;
+        public List<ItemConfigDto> items;
+    }
+
+    public enum ItemType
+    {
+        Unknown = 0,
+        currency = 1,
+        entitlement = 2,
+        hero = 3,
+        special = 4,
+        skill_fragment = 5,
+        mod_fragment = 6
     }
 
     [Serializable]
     public class ItemConfigDto
     {
-        public string type;
+        public string itemId;
+        public ItemType type;
         public string name;
         public string itemDesc;
         public string rarity;

@@ -80,10 +80,71 @@ local function load_json_file(file_name)
     return nil
 end
 
+local function deep_copy(value)
+    if type(value) ~= "table" then
+        return value
+    end
+    local out = {}
+    for k, v in pairs(value) do
+        out[k] = deep_copy(v)
+    end
+    return out
+end
+
+local function is_array(value)
+    return type(value) == "table" and #value > 0
+end
+
+local function map_by_field(list, key_field)
+    local out = {}
+    for _, row in ipairs(list or {}) do
+        if type(row) == "table" then
+            local key = row[key_field]
+            if type(key) == "string" and key ~= "" then
+                out[key] = row
+            end
+        end
+    end
+    return out
+end
+
+local function normalize_items(items)
+    if not is_array(items) then
+        return items or {}
+    end
+    return map_by_field(items, "itemId")
+end
+
+local function normalize_checkin_rewards(rewards)
+    if not is_array(rewards) then
+        local out = {}
+        for k, v in pairs(rewards or {}) do
+            local nkv = tonumber(k)
+            if nkv ~= nil then
+                out[nkv] = v
+            else
+                out[k] = v
+            end
+        end
+        return out
+    end
+    local out = {}
+    for _, day in ipairs(rewards) do
+        if type(day) == "table" then
+            local day_index = tonumber(day.dayIndex)
+            if day_index ~= nil then
+                out[day_index] = day.rewardItems or {}
+            end
+        end
+    end
+    return out
+end
+
 local function load_items_from_json()
     local decoded = load_json_file("items.json")
     if decoded ~= nil and type(decoded.items) == "table" then
-        return decoded.items
+        M.items_raw = deep_copy(decoded)
+        return normalize_items(decoded.items)
     end
     return nil
 end
@@ -112,31 +173,6 @@ end
 -- NakamaMod/config.lua
 -- 职责：集中存放 Mod 的静态配置数据（道具、抽卡、签到、内购商品、管理端参数等）。
 -- 使用方式：业务模块通过 require("config") 读取本表；本文件不应包含运行时逻辑。
-
--- 道具/货币/角色定义表
-local fallback_items = {
-    ["1"] = { type = "currency", name = "金币", itemDesc = "金币说明" },
-    ["2"] = { type = "currency", name = "水晶", itemDesc = "水晶说明" },
-    ["gold"] = { type = "currency", name = "金币", itemDesc = "金币说明" },
-    ["gem"] = { type = "currency", name = "水晶", itemDesc = "水晶说明" },
-    ["energy"] = { type = "currency", name = "Energy", itemDesc = "Energy说明" },
-    ["item_vip_active"] = { type = "entitlement", name = "VIP Monthly Card", itemDesc = "VIP Monthly Card说明", max_stack = 1 },
-    ["item_svip_active"] = { type = "entitlement", name = "SVIP Monthly Card", itemDesc = "SVIP Monthly Card说明", max_stack = 1 },
-    ["hero_ssr_001"] = { type = "hero", name = "SSR Knight", itemDesc = "SSR Knight说明", rarity = "SSR" },
-    ["hero_sr_001"] = { type = "hero", name = "SR Archer", itemDesc = "SR Archer说明", rarity = "SR" },
-    ["hero_r_001"] = { type = "hero", name = "R Soldier", itemDesc = "R Soldier说明", rarity = "R" },
-    ["010300001"] = { type = "special", name = "时光沙漏", itemDesc = "时光沙漏说明", max_stack = 9999 },
-    ["020100001"] = { type = "skill_fragment", name = "技能碎片1", itemDesc = "技能碎片说明", max_stack = 999 },
-    ["020200001"] = { type = "skill_fragment", name = "技能碎片2", itemDesc = "技能碎片说明", max_stack = 999 },
-    ["020300001"] = { type = "skill_fragment", name = "技能碎片3", itemDesc = "技能碎片说明", max_stack = 999 },
-    ["020400001"] = { type = "skill_fragment", name = "技能碎片4", itemDesc = "技能碎片说明", max_stack = 999 },
-    ["020500001"] = { type = "skill_fragment", name = "技能碎片5", itemDesc = "技能碎片说明", max_stack = 999 },
-    ["030100001"] = { type = "mod_fragment", name = "改装件碎片6", itemDesc = "改装件碎片说明", max_stack = 999 },
-    ["030200001"] = { type = "mod_fragment", name = "改装件碎片7", itemDesc = "改装件碎片说明", max_stack = 999 },
-    ["030300001"] = { type = "mod_fragment", name = "改装件碎片8", itemDesc = "改装件碎片说明", max_stack = 999 },
-    ["030400001"] = { type = "mod_fragment", name = "改装件碎片9", itemDesc = "改装件碎片说明", max_stack = 999 },
-    ["030500001"] = { type = "mod_fragment", name = "改装件碎片10", itemDesc = "改装件碎片说明", max_stack = 999 },
-}
 
 M.items = load_items_from_json()
 if M.items == nil then
@@ -168,166 +204,6 @@ M.gacha = {
 -- 权益配置统一由 data/vip.json 加载，避免使用测试默认值。
 M.benefit_plans = {}
 
--- 签到配置 (V1.1 - 7天循环)
-M.checkin = {
-    -- 7天周期奖励表
-    rewards = {
-        [1] = { { item_id = "gold", count = 100 } },
-        [2] = { { item_id = "gem", count = 50 } },
-        [3] = { { item_id = "010300001", count = 1 } },
-        [4] = { { item_id = "020100001", count = 5 } }, -- 绿色技能碎片
-        [5] = { { item_id = "030100001", count = 3 } }, -- 绿色改装件碎片
-        [6] = { { item_id = "gold", count = 200 }, { item_id = "gem", count = 30 } },
-        [7] = { { item_id = "010300001", count = 2 } },
-    },
-    makeup_cost = { item_id = "gem", count = 20 },
-}
-
--- 商店配置
-M.shop = {
-    refresh_cost = { item_id = "gem", count = 5 },
-    goods = {
-        -- 特惠商店（Special Shop）
-        ["SHOP_SKILL_GREEN_5"] = {
-            shopType = "special",
-            displayMode = "random",
-            weight = 100,
-            costType = "gold",
-            costValue = 200,
-            limitType = "per_refresh",
-            limitValue = 1,
-            rewardItems = { { id = "020100001", count = 5 } }
-        },
-        ["SHOP_SKILL_BLUE_3"] = {
-            shopType = "special",
-            displayMode = "random",
-            weight = 50,
-            costType = "gold",
-            costValue = 400,
-            limitType = "per_refresh",
-            limitValue = 1,
-            rewardItems = { { id = "020200001", count = 3 } }
-        },
-        ["SHOP_SKILL_PURPLE_1"] = {
-            shopType = "special",
-            displayMode = "random",
-            weight = 10,
-            costType = "gem",
-            costValue = 15,
-            limitType = "per_refresh",
-            limitValue = 1,
-            rewardItems = { { id = "020300001", count = 1 } }
-        },
-        ["SHOP_MOD_GREEN_5"] = {
-            shopType = "special",
-            displayMode = "random",
-            weight = 100,
-            costType = "gold",
-            costValue = 200,
-            limitType = "per_refresh",
-            limitValue = 1,
-            rewardItems = { { id = "030100001", count = 5 } }
-        },
-        ["SHOP_MOD_BLUE_3"] = {
-            shopType = "special",
-            displayMode = "random",
-            weight = 50,
-            costType = "gold",
-            costValue = 400,
-            limitType = "per_refresh",
-            limitValue = 1,
-            rewardItems = { { id = "030200001", count = 3 } }
-        },
-        ["SHOP_TIMESAND_1"] = {
-            shopType = "special",
-            displayMode = "random",
-            weight = 20,
-            costType = "gem",
-            costValue = 5,
-            limitType = "per_refresh",
-            limitValue = 1,
-            rewardItems = { { id = "010300001", count = 1 } }
-        },
-
-        -- 固定展示限购商品
-        ["SHOP_SKILL_GOLD_WEEK"] = {
-            shopType = "special",
-            displayMode = "fixed",
-            costType = "gem",
-            costValue = 30,
-            limitType = "weekly",
-            limitValue = 1,
-            rewardItems = { { id = "020300001", count = 1 } } -- 示例配置，实际可能变化
-        },
-        ["SHOP_GROWTH_GIFT_PERM"] = {
-            shopType = "special",
-            displayMode = "fixed",
-            costType = "gem",
-            costValue = 30,
-            limitType = "permanent",
-            limitValue = 1,
-            rewardItems = { { id = "gold", count = 500 }, { id = "010300001", count = 2 } }
-        },
-
-        -- 水晶商店（Crystal Shop）- IAP
-        ["CRYSTAL_001"] = { shopType = "crystal", displayMode = "iap", costType = "rmb", costValue = 600, rewardItems = { { id = "gem", count = 60 } } },
-        ["CRYSTAL_002"] = { shopType = "crystal", displayMode = "iap", costType = "rmb", costValue = 1800, rewardItems = { { id = "gem", count = 180 } } },
-        ["CRYSTAL_003"] = { shopType = "crystal", displayMode = "iap", costType = "rmb", costValue = 3000, rewardItems = { { id = "gem", count = 300 } } },
-        ["CRYSTAL_004"] = { shopType = "crystal", displayMode = "iap", costType = "rmb", costValue = 6800, rewardItems = { { id = "gem", count = 700 } } }, -- 含赠送
-        ["CRYSTAL_005"] = { shopType = "crystal", displayMode = "iap", costType = "rmb", costValue = 9800, rewardItems = { { id = "gem", count = 1030 } } },
-        ["CRYSTAL_006"] = { shopType = "crystal", displayMode = "iap", costType = "rmb", costValue = 19800, rewardItems = { { id = "gem", count = 2130 } } },
-        ["CRYSTAL_007"] = { shopType = "crystal", displayMode = "iap", costType = "rmb", costValue = 32800, rewardItems = { { id = "gem", count = 3630 } } },
-        ["CRYSTAL_008"] = { shopType = "crystal", displayMode = "iap", costType = "rmb", costValue = 64800, rewardItems = { { id = "gem", count = 7480 } } },
-
-        -- 金币商店（Gold Shop）
-        ["GOLD_001"] = {
-            shopType = "gold",
-            displayMode = "exchange",
-            costType = "gem",
-            costValue = 1,
-            limitType = "none",
-            limitValue = 0,
-            rewardItems = { { id = "gold", count = 25 } }
-        },
-        ["GOLD_002"] = {
-            shopType = "gold",
-            displayMode = "exchange",
-            costType = "gem",
-            costValue = 10,
-            limitType = "daily",
-            limitValue = 1,
-            rewardItems = { { id = "gold", count = 250 } }
-        },
-        ["GOLD_003"] = {
-            shopType = "gold",
-            displayMode = "exchange",
-            costType = "gem",
-            costValue = 50,
-            limitType = "daily",
-            limitValue = 1,
-            rewardItems = { { id = "gold", count = 1300 } }
-        },
-        ["GOLD_004"] = {
-            shopType = "gold",
-            displayMode = "exchange",
-            costType = "gem",
-            costValue = 100,
-            limitType = "daily",
-            limitValue = 1,
-            rewardItems = { { id = "gold", count = 2800 } }
-        },
-        ["GOLD_005"] = {
-            shopType = "gold",
-            displayMode = "exchange",
-            costType = "gem",
-            costValue = 500,
-            limitType = "daily",
-            limitValue = 1,
-            rewardItems = { { id = "gold", count = 15000 } }
-        },
-    }
-}
-
 -- 商品配置统一由 data/vip.json 与 data/gift.json 构建。
 M.iap_products = {}
 
@@ -335,7 +211,11 @@ local shop_json = load_json_file("shop.json")
 if shop_json == nil or type(shop_json.goods) ~= "table" or type(shop_json.refresh_cost) ~= "table" then
     error("FAILED_TO_LOAD_SHOP_JSON: shop.json not found/readable or invalid")
 end
-M.shop = shop_json
+M.shop_raw = deep_copy(shop_json)
+M.shop = deep_copy(shop_json)
+if is_array(M.shop.goods) then
+    M.shop.goods = map_by_field(M.shop.goods, "goodsId")
+end
 
 local vip_json = load_json_file("vip.json")
 if vip_json == nil or type(vip_json.benefit_plans) ~= "table" or type(vip_json.monthly_products) ~= "table" then
@@ -372,14 +252,19 @@ local checkin_json = load_json_file("checkin.json")
 if checkin_json == nil or type(checkin_json.rewards) ~= "table" or type(checkin_json.makeup_cost) ~= "table" then
     error("FAILED_TO_LOAD_CHECKIN_JSON: checkin.json not found/readable or invalid")
 end
-M.checkin = checkin_json
-M.checkin.rewards = normalize_number_key_table(M.checkin.rewards)
+M.checkin_raw = deep_copy(checkin_json)
+M.checkin = deep_copy(checkin_json)
+M.checkin.rewards = normalize_checkin_rewards(M.checkin.rewards)
 
 local gift_json = load_json_file("gift.json")
 if gift_json == nil or type(gift_json.packs) ~= "table" then
     error("FAILED_TO_LOAD_GIFT_JSON: gift.json not found/readable or invalid")
 end
-M.gift = gift_json
+M.gift_raw = deep_copy(gift_json)
+M.gift = deep_copy(gift_json)
+if is_array(M.gift.packs) then
+    M.gift.packs = map_by_field(M.gift.packs, "packId")
+end
 
 for pack_id, pack_cfg in pairs(M.gift.packs) do
     if type(M.iap_products[pack_id]) ~= "table" then

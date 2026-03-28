@@ -1,12 +1,12 @@
 {
-    "rewards": {
-        "1": [ { "item_id": "gold", "count": 100 } ],
-        "2": [ { "item_id": "gem", "count": 50 } ],
-        "3": [ { "item_id": "010300001", "count": 1 } ],
-        "4": [ { "item_id": "020100001", "count": 5 } ],
-        "5": [ { "item_id": "030100001", "count": 3 } ],
-        "6": [ { "item_id": "gold", "count": 200 }, { "item_id": "gem", "count": 30 } ],
-        "7": [ { "item_id": "010300001", "count": 2 } ]
-    },
+    "rewards": [
+        { "dayIndex": 1, "rewardItems": [ { "item_id": "gold", "count": 100 } ] },
+        { "dayIndex": 2, "rewardItems": [ { "item_id": "gem", "count": 50 } ] },
+        { "dayIndex": 3, "rewardItems": [ { "item_id": "010300001", "count": 1 } ] },
+        { "dayIndex": 4, "rewardItems": [ { "item_id": "020100001", "count": 5 } ] },
+        { "dayIndex": 5, "rewardItems": [ { "item_id": "030100001", "count": 3 } ] },
+        { "dayIndex": 6, "rewardItems": [ { "item_id": "gold", "count": 200 }, { "item_id": "gem", "count": 30 } ] },
+        { "dayIndex": 7, "rewardItems": [ { "item_id": "010300001", "count": 2 } ] }
+    ],
     "makeup_cost": { "item_id": "gem", "count": 20 }
 }

@@ -25,16 +25,16 @@ end
 -- 根据配置名称返回对应配置对象。
 local function build_data(name)
     if name == "checkin" then
-        return config.checkin
+        return config.checkin_raw or config.checkin
     end
     if name == "gift" then
-        return config.gift
+        return config.gift_raw or config.gift
     end
     if name == "items" then
-        return config.items
+        return config.items_raw or { items = config.items }
     end
     if name == "shop" then
-        return config.shop
+        return config.shop_raw or config.shop
     end
     if name == "vip" then
         return config.vip

@@ -6,18 +6,34 @@ namespace NakamaServerMod.UnitySdk
     [Serializable]
     public class GiftConfigDto
     {
-        public Dictionary<string, GiftPackConfigDto> packs;
+        public List<GiftPackConfigDto> packs;
+    }
+
+    public enum GiftPackType
+    {
+        Unknown = 0,
+        daily = 1,
+        activity = 2,
+        first_recharge = 3
+    }
+
+    public enum GiftLimitType
+    {
+        Unknown = 0,
+        daily = 1,
+        activity_once = 2,
+        permanent = 3
     }
 
     [Serializable]
     public class GiftPackConfigDto
     {
         public string packId;
-        public string packType;
+        public GiftPackType packType;
         public string packName;
         public string priceCurrency;
         public int priceAmount;
-        public string limitType;
+        public GiftLimitType limitType;
         public int limitValue;
         public string activityId;
         public GiftActiveTimeRangeDto activeTimeRange;

@@ -2,6 +2,7 @@ using NUnit.Framework;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using UnityEngine;
 namespace NakamaServerMod.UnitySdk.Tests
 {
     [TestFixture]
@@ -91,6 +92,7 @@ namespace NakamaServerMod.UnitySdk.Tests
         private async Task CompleteVipPurchaseAsync(GameClient client, VipService vipService)
         {
             var result = await vipService.PurchaseByProductIdAsync("vip");
+            Debug.Log(JsonUtility.ToJson(result));
             Assert.IsTrue(result.success, result.error);
             if (result.payment_required)
             {
