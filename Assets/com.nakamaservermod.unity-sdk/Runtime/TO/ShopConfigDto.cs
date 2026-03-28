@@ -12,7 +12,8 @@ namespace NakamaServerMod.UnitySdk
 
     public enum ShopType
     {
-        Unknown = 0,
+        Unknown = -1,
+        All = 0,
         special = 1,
         crystal = 2,
         gold = 3
@@ -20,7 +21,8 @@ namespace NakamaServerMod.UnitySdk
 
     public enum ShopDisplayMode
     {
-        Unknown = 0,
+        Unknown = -1,
+        All = 0,
         random = 1,
         fix = 2,
         iap = 3,
@@ -29,7 +31,8 @@ namespace NakamaServerMod.UnitySdk
 
     public enum ShopCostType
     {
-        Unknown = 0,
+        Unknown = -1,
+        All = 0,
         gold = 1,
         gem = 2,
         rmb = 3
@@ -37,7 +40,8 @@ namespace NakamaServerMod.UnitySdk
 
     public enum ShopLimitType
     {
-        Unknown = 0,
+        Unknown = -1,
+        All = 0,
         per_refresh = 1,
         weekly = 2,
         permanent = 3,
