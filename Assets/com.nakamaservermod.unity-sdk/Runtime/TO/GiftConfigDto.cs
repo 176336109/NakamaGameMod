@@ -11,7 +11,8 @@ namespace NakamaServerMod.UnitySdk
 
     public enum GiftPackType
     {
-        Unknown = 0,
+        Unknown = -1,
+        All = 0,
         daily = 1,
         activity = 2,
         first_recharge = 3
@@ -19,7 +20,8 @@ namespace NakamaServerMod.UnitySdk
 
     public enum GiftLimitType
     {
-        Unknown = 0,
+        Unknown = -1,
+        All = 0,
         daily = 1,
         activity_once = 2,
         permanent = 3

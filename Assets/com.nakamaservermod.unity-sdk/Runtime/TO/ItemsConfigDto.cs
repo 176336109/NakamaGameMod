@@ -11,7 +11,8 @@ namespace NakamaServerMod.UnitySdk
 
     public enum ItemType
     {
-        Unknown = 0,
+        Unknown = -1,
+        All = 0,
         currency = 1,
         entitlement = 2,
         hero = 3,
