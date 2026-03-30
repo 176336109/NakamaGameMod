@@ -30,11 +30,15 @@ namespace NakamaServerMod.UnitySdk.Tests
             Assert.IsFalse(string.IsNullOrEmpty(gameConfig.items));
             Assert.IsFalse(string.IsNullOrEmpty(gameConfig.shop));
             Assert.IsFalse(string.IsNullOrEmpty(gameConfig.vip));
+            Assert.IsFalse(string.IsNullOrEmpty(gameConfig.skillEnhancementItemConfigs));
+            Assert.IsFalse(string.IsNullOrEmpty(gameConfig.skillEnhancementUpgradeConfigs));
             TestContext.WriteLine("game_config.checkin json: " + (gameConfig.checkin ?? ""));
             TestContext.WriteLine("game_config.gift json: " + (gameConfig.gift ?? ""));
             TestContext.WriteLine("game_config.items json: " + (gameConfig.items ?? ""));
             TestContext.WriteLine("game_config.shop json: " + (gameConfig.shop ?? ""));
             TestContext.WriteLine("game_config.vip json: " + (gameConfig.vip ?? ""));
+            TestContext.WriteLine("game_config.skillEnhancementItemConfigs json: " + (gameConfig.skillEnhancementItemConfigs ?? ""));
+            TestContext.WriteLine("game_config.skillEnhancementUpgradeConfigs json: " + (gameConfig.skillEnhancementUpgradeConfigs ?? ""));
         }
 
         [Test]
@@ -47,6 +51,21 @@ namespace NakamaServerMod.UnitySdk.Tests
             Assert.IsTrue(gameConfig.vip.Contains("\"monthly_products\""));
             Assert.IsTrue(gameConfig.vip.Contains("\"benefitPlanId\":\"vip\""));
             Assert.IsTrue(gameConfig.vip.Contains("\"benefitPlanId\":\"svip\""));
+        }
+
+        [Test]
+        public async Task Config_GetSkillEnhancementConfigsAsync_Succeeds()
+        {
+            var client = await CreateAuthenticatedClientAsync("配置_技能强化配置DTO读取");
+            var service = new ConfigService(client);
+            var itemConfigs = await service.GetSkillEnhancementItemConfigsAsync();
+            var upgradeConfigs = await service.GetSkillEnhancementUpgradeConfigsAsync();
+            Assert.IsNotNull(itemConfigs);
+            Assert.IsNotNull(itemConfigs.skillEnhancementItemConfigs);
+            Assert.IsTrue(itemConfigs.skillEnhancementItemConfigs.Count > 0);
+            Assert.IsNotNull(upgradeConfigs);
+            Assert.IsNotNull(upgradeConfigs.skillEnhancementUpgradeConfigs);
+            Assert.IsTrue(upgradeConfigs.skillEnhancementUpgradeConfigs.Count > 0);
         }
     }
 }
