@@ -49,6 +49,29 @@ local function to_number(v, default_value)
     return n
 end
 
+local function normalize_expire_at(v)
+    local n = to_number(v, nil)
+    if n == nil then
+        return nil
+    end
+    if n <= 0 then
+        return nil
+    end
+    return n
+end
+
+local function normalize_level(level)
+    local n = to_number(level, 1)
+    if n == nil then
+        return 1
+    end
+    n = math.floor(n)
+    if n < 1 then
+        return 1
+    end
+    return n
+end
+
 -- 当前秒级时间戳。
 local function now_ts()
     return os.time()
@@ -79,6 +102,92 @@ local function resolve_item_id(item_id)
         return nil
     end
     return normalized
+end
+
+local function clone_row(row)
+    local out = {}
+    if type(row) ~= "table" then
+        return out
+    end
+    for k, v in pairs(row) do
+        out[k] = v
+    end
+    return out
+end
+
+local function parse_item_id_from_stack_key(stack_key)
+    if type(stack_key) ~= "string" or stack_key == "" then
+        return nil
+    end
+    local matched = string.match(stack_key, "^stack:(.-):L%d+:")
+    if matched ~= nil and matched ~= "" then
+        return resolve_item_id(matched)
+    end
+    if string.find(stack_key, ":", 1, true) == nil then
+        return resolve_item_id(stack_key)
+    end
+    return nil
+end
+
+local function build_stack_key_for_normal_item(item_data, fallback_key)
+    local item_id = resolve_item_id(item_data and item_data.itemId)
+    if item_id == nil then
+        item_id = parse_item_id_from_stack_key(fallback_key)
+    end
+    local level = normalize_level(item_data and item_data.level)
+    local expire_at = to_number(item_data and item_data.expireAt, nil)
+    if item_id == nil then
+        if type(fallback_key) == "string" and fallback_key ~= "" then
+            return fallback_key
+        end
+        return nil
+    end
+    if expire_at == nil then
+        return "stack:" .. tostring(item_id) .. ":L" .. tostring(level) .. ":P"
+    end
+    return "stack:" .. tostring(item_id) .. ":L" .. tostring(level) .. ":E" .. tostring(expire_at)
+end
+
+local function decode_normal_item_value(raw_value)
+    local out = {}
+    if type(raw_value) ~= "table" then
+        return out
+    end
+    local source_rows = raw_value
+    if type(raw_value.normalItemList) == "table" then
+        source_rows = raw_value.normalItemList
+    end
+    for key, row in pairs(source_rows) do
+        if type(row) == "table" then
+            local map_key = build_stack_key_for_normal_item(row, key)
+            if map_key ~= nil then
+                local copied = clone_row(row)
+                copied.itemId = resolve_item_id(copied.itemId) or parse_item_id_from_stack_key(map_key)
+                out[map_key] = copied
+            end
+        end
+    end
+    return out
+end
+
+local function encode_normal_item_value(raw_value)
+    local rows = {}
+    if type(raw_value) ~= "table" then
+        return rows
+    end
+    for key, row in pairs(raw_value) do
+        if type(row) == "table" then
+            local copied = clone_row(row)
+            copied.itemId = resolve_item_id(copied.itemId) or parse_item_id_from_stack_key(key)
+            rows[#rows + 1] = copied
+        end
+    end
+    table.sort(rows, function(a, b)
+        local ak = build_stack_key_for_normal_item(a, "")
+        local bk = build_stack_key_for_normal_item(b, "")
+        return tostring(ak or "") < tostring(bk or "")
+    end)
+    return { normalItemList = rows }
 end
 
 -- 解析钱包字段为 table。
@@ -138,7 +247,8 @@ local function get_item_config(item_id)
     if item_def.max_stack ~= nil and tonumber(item_def.max_stack) == 1 and (item_def.type == "time_limited" or item_def.type == "entitlement") then
         stackable = false
     end
-    local has_expire_at = is_vip_like or is_entitlement or item_def.type == "time_limited"
+    local require_expire_at = is_vip_like or is_entitlement or item_def.type == "time_limited"
+    local has_expire_at = require_expire_at or item_def.hasExpireAt == true or item_def.has_expire_at == true
     local occupy_slot = not is_currency
     local max_stack_count = to_number(item_def.max_stack, 999999999)
     return {
@@ -148,6 +258,7 @@ local function get_item_config(item_id)
         itemType = item_def.type,
         stackable = stackable,
         hasExpireAt = has_expire_at,
+        requireExpireAt = require_expire_at,
         occupySlot = occupy_slot,
         maxStackCount = max_stack_count
     }
@@ -207,9 +318,13 @@ local function load_snapshot(user_id)
     end
     local by_key = {}
     for _, obj in ipairs(objects_or_err) do
+        local value = obj.value or {}
+        if obj.key == NORMAL_ITEM_KEY then
+            value = decode_normal_item_value(value)
+        end
         by_key[obj.key] = {
             key = obj.key,
-            value = obj.value or {},
+            value = value,
             version = obj.version
         }
     end
@@ -334,11 +449,15 @@ local function write_objects(user_id, snapshot, touched)
     for key, _ in pairs(touched) do
         local obj = snapshot[key]
         if obj then
+            local write_value = obj.value
+            if key == NORMAL_ITEM_KEY then
+                write_value = encode_normal_item_value(obj.value)
+            end
             writes[#writes + 1] = {
                 collection = BACKPACK_COLLECTION,
                 key = key,
                 user_id = user_id,
-                value = obj.value,
+                value = write_value,
                 version = obj.version,
                 permission_read = 1,
                 permission_write = 1
@@ -379,11 +498,19 @@ local function normalize_items(raw_items)
         out[#out + 1] = {
             id = item_id,
             count = math.floor(count),
-            expireAt = to_number(item.expireAt, nil),
+            expireAt = normalize_expire_at(item.expireAt),
+            level = normalize_level(item.level),
             benefitPlanId = item.benefitPlanId
         }
     end
     return out, nil
+end
+
+local function build_stack_map_key(item_id, level, expire_at)
+    if expire_at == nil then
+        return "stack:" .. tostring(item_id) .. ":L" .. tostring(level) .. ":P"
+    end
+    return "stack:" .. tostring(item_id) .. ":L" .. tostring(level) .. ":E" .. tostring(expire_at)
 end
 
 -- 聚合快照中当前有效道具数量。
@@ -405,17 +532,86 @@ local function aggregate_inventory(snapshot, now)
                 counts[item_id] = (counts[item_id] or 0) + 1
             end
         elseif key == NORMAL_ITEM_KEY and type(value) == "table" then
-            for item_id, item_data in pairs(value) do
+            for map_key, item_data in pairs(value) do
                 local count = to_number(item_data and item_data.count, 0)
                 local has_expire = item_data and item_data.hasExpireAt == true
                 local expire_at = to_number(item_data and item_data.expireAt, nil)
                 if count > 0 and ((not has_expire) or is_effective(expire_at, now)) then
-                    counts[item_id] = (counts[item_id] or 0) + count
+                    local item_id = resolve_item_id(item_data and item_data.itemId) or resolve_item_id(map_key)
+                    if item_id ~= nil then
+                        counts[item_id] = (counts[item_id] or 0) + count
+                    end
                 end
             end
         end
     end
     return counts
+end
+
+function M.get_item_total_count(user_id, item_id)
+    local ok, snapshot = load_snapshot(user_id)
+    if not ok then
+        return false, snapshot
+    end
+    local now = now_ts()
+    local touched = {}
+    cleanup_expired(snapshot, now, touched)
+    local counts = aggregate_inventory(snapshot, now)
+    local normalized_item_id = resolve_item_id(item_id)
+    if normalized_item_id == nil then
+        return true, 0
+    end
+    return true, counts[normalized_item_id] or 0
+end
+
+function M.find_stack_records(user_id, item_id, level, expire_at)
+    local ok, snapshot = load_snapshot(user_id)
+    if not ok then
+        return false, snapshot
+    end
+    local out = {}
+    local now = now_ts()
+    local target_level = normalize_level(level)
+    local target_expire = to_number(expire_at, nil)
+    local normal_obj = snapshot[NORMAL_ITEM_KEY]
+    if normal_obj and type(normal_obj.value) == "table" then
+        for _, item_data in pairs(normal_obj.value) do
+            if type(item_data) == "table" and resolve_item_id(item_data.itemId) == resolve_item_id(item_id) then
+                local count = to_number(item_data.count, 0)
+                if count > 0 then
+                    local item_level = normalize_level(item_data.level)
+                    local item_expire = to_number(item_data.expireAt, nil)
+                    local has_expire = item_data.hasExpireAt == true
+                    local effective = (not has_expire) or is_effective(item_expire, now)
+                    local same_level = item_level == target_level
+                    local same_expire = target_expire == nil or item_expire == target_expire
+                    if effective and same_level and same_expire then
+                        out[#out + 1] = {
+                            itemId = item_id,
+                            level = item_level,
+                            count = count,
+                            expireAt = item_expire
+                        }
+                    end
+                end
+            end
+        end
+    end
+    table.sort(out, function(a, b)
+        local ae = a.expireAt
+        local be = b.expireAt
+        if ae == nil and be == nil then
+            return false
+        end
+        if ae == nil then
+            return false
+        end
+        if be == nil then
+            return true
+        end
+        return ae < be
+    end)
+    return true, out
 end
 
 -- 发放道具主流程：校验、占槽检查、钱包更新、落盘回滚。
@@ -441,16 +637,39 @@ function M.add_items(context, user_id, items_to_add, log_source, log_ref)
         elseif item_cfg.stackable then
             local normal_obj = get_normal_item_object(snapshot)
             local normal_map = normal_obj.value
-            local current = normal_map[item.id]
-            if type(current) ~= "table" then
+            local item_level = normalize_level(item.level)
+            local target_expire = normalize_expire_at(item.expireAt)
+            if item_cfg.requireExpireAt then
+                if target_expire == nil then
+                    return false, "MISSING_EXPIRE_AT:" .. item.id
+                end
+            end
+            local current = nil
+            for _, stack_record in pairs(normal_map) do
+                if type(stack_record) == "table" and resolve_item_id(stack_record.itemId) == resolve_item_id(item.id) then
+                    local record_level = normalize_level(stack_record.level)
+                    local has_expire = stack_record.hasExpireAt == true
+                    local record_expire = to_number(stack_record.expireAt, nil)
+                    local same_level = record_level == item_level
+                    local same_expire_batch = ((not has_expire) and (target_expire == nil)) or (has_expire and record_expire == target_expire)
+                    if same_level and same_expire_batch then
+                        current = stack_record
+                        break
+                    end
+                end
+            end
+            if current == nil then
                 current = {
                     itemId = item.id,
                     itemType = item_cfg.itemType,
+                    level = item_level,
                     stackable = true,
-                    hasExpireAt = item_cfg.hasExpireAt,
+                    hasExpireAt = target_expire ~= nil,
                     count = 0
                 }
-                normal_map[item.id] = current
+                current.expireAt = target_expire
+                local map_key = build_stack_map_key(item.id, item_level, target_expire)
+                normal_map[map_key] = current
             end
             local current_count = to_number(current.count, 0)
             local exists_effective = current_count > 0 and ((current.hasExpireAt ~= true) or is_effective(to_number(current.expireAt, nil), now))
@@ -460,18 +679,10 @@ function M.add_items(context, user_id, items_to_add, log_source, log_ref)
             current.count = current_count + item.count
             current.itemType = item_cfg.itemType
             current.stackable = true
-            current.hasExpireAt = item_cfg.hasExpireAt
-            if item_cfg.hasExpireAt then
-                local expire_at = item.expireAt
-                if expire_at == nil then
-                    return false, "MISSING_EXPIRE_AT:" .. item.id
-                end
-                local old_expire = to_number(current.expireAt, nil)
-                if old_expire == nil then
-                    current.expireAt = expire_at
-                else
-                    current.expireAt = math.max(old_expire, expire_at)
-                end
+            current.hasExpireAt = target_expire ~= nil
+            current.level = item_level
+            if target_expire ~= nil then
+                current.expireAt = target_expire
             else
                 current.expireAt = nil
             end
@@ -573,13 +784,39 @@ function M.consume_items(context, user_id, items_to_consume, log_source, log_ref
             local required = item.count
             local candidates = {}
             local normal_obj = snapshot[NORMAL_ITEM_KEY]
+            local target_expire = normalize_expire_at(item.expireAt)
             if normal_obj and type(normal_obj.value) == "table" then
-                local normal_item = normal_obj.value[item.id]
-                local normal_count = to_number(normal_item and normal_item.count, 0)
-                if normal_count > 0 then
-                    candidates[#candidates + 1] = { key = NORMAL_ITEM_KEY, expireAt = to_number(normal_item.expireAt, nil), count = normal_count, legacy = true }
+                local target_level = normalize_level(item.level)
+                for _, normal_item in pairs(normal_obj.value) do
+                    if type(normal_item) == "table" and resolve_item_id(normal_item.itemId) == resolve_item_id(item.id) then
+                        local item_level = normalize_level(normal_item.level)
+                        local normal_count = to_number(normal_item.count, 0)
+                        local item_expire = to_number(normal_item.expireAt, nil)
+                        local same_expire = target_expire == nil or item_expire == target_expire
+                        if item_level == target_level and normal_count > 0 and same_expire then
+                            candidates[#candidates + 1] = {
+                                expireAt = item_expire,
+                                count = normal_count,
+                                value = normal_item
+                            }
+                        end
+                    end
                 end
             end
+            table.sort(candidates, function(a, b)
+                local ae = a.expireAt
+                local be = b.expireAt
+                if ae == nil and be == nil then
+                    return false
+                end
+                if ae == nil then
+                    return false
+                end
+                if be == nil then
+                    return true
+                end
+                return ae < be
+            end)
             local total = 0
             for _, c in ipairs(candidates) do
                 total = total + c.count
@@ -593,14 +830,10 @@ function M.consume_items(context, user_id, items_to_consume, log_source, log_ref
                     break
                 end
                 local take = math.min(remain, c.count)
-                if c.legacy then
-                    local legacy_map = snapshot[c.key].value
-                    local legacy_item = legacy_map[item.id]
-                    if legacy_item then
-                        legacy_item.count = to_number(legacy_item.count, 0) - take
-                    end
+                if c.value then
+                    c.value.count = to_number(c.value.count, 0) - take
                 end
-                touched[c.key] = true
+                touched[NORMAL_ITEM_KEY] = true
                 remain = remain - take
             end
         else
@@ -786,6 +1019,7 @@ local function collect_backpack_items(snapshot, now, limit, item_type_filter)
                     key = key,
                     id = value.itemId,
                     count = count,
+                    level = normalize_level(value.level),
                     itemType = item_type,
                     itemName = item_name,
                     itemDesc = item_desc,
@@ -796,17 +1030,19 @@ local function collect_backpack_items(snapshot, now, limit, item_type_filter)
                 end
             end
         elseif key == NORMAL_ITEM_KEY and type(value) == "table" then
-            for item_id, item_data in pairs(value) do
+            for map_key, item_data in pairs(value) do
                 local count = to_number(item_data and item_data.count, 0)
                 local expire_at = to_number(item_data and item_data.expireAt, nil)
                 local has_expire_at = item_data and item_data.hasExpireAt == true
                 if count > 0 and ((not has_expire_at) or is_effective(expire_at, now)) then
+                    local item_id = resolve_item_id(item_data and item_data.itemId) or resolve_item_id(map_key)
                     local item_type, item_name, item_desc = get_item_meta(item_id, item_data and item_data.itemType or nil)
                     if item_type_matches(item_type_filter, item_type) then
                     items[#items + 1] = {
                         key = NORMAL_ITEM_KEY,
                         id = item_id,
                         count = count,
+                        level = normalize_level(item_data and item_data.level),
                         itemType = item_type,
                         itemName = item_name,
                         itemDesc = item_desc,

@@ -6,6 +6,7 @@ local iap = require("domain.iap")
 local vip_svip = require("domain.vip_svip")
 local shop = require("domain.shop")
 local gift = require("domain.gift")
+local skill_enhancement = require("domain.skill_enhancement")
 local backpack_service = require("service.backpack_service")
 local checkin_service = require("service.checkin_service")
 local gacha_service = require("service.gacha_service")
@@ -14,6 +15,7 @@ local vip_svip_service = require("service.vip_svip_service")
 local iap_service = require("service.iap_service")
 local gift_service = require("service.gift_service")
 local config_service = require("service.config_service")
+local skill_enhancement_service = require("service.skill_enhancement_service")
 
 -- NakamaMod/main.lua
 -- Nakama Lua runtime 使用顶层代码直接注册 RPC，不需要 InitModule / initializer。
@@ -31,6 +33,7 @@ iap_service.wire_item_gateway(backpack, iap)
 vip_svip_service.set_iap_domain(iap)
 gift_service.wire_item_gateway(backpack, gift)
 gift_service.set_iap_service(iap_service)
+skill_enhancement_service.wire_item_gateway(backpack, skill_enhancement)
 
 -- 1) Backpack RPCs
 nk.register_rpc(backpack_service.rpc_debug_add_items, "debug_add_items")
@@ -45,6 +48,8 @@ nk.register_rpc(backpack_service.rpc_backpack_consume, "backpack_consume")
 nk.register_rpc(backpack_service.rpc_backpack_use, "backpack_use")
 nk.register_rpc(backpack_service.rpc_backpack_cleanup, "backpack_cleanup")
 nk.register_rpc(backpack_service.rpc_backpack_get_state, "backpack_get_state")
+nk.register_rpc(skill_enhancement_service.rpc_skill_enhancement_get_detail, "skill_enhancement_get_detail")
+nk.register_rpc(skill_enhancement_service.rpc_skill_enhancement_upgrade, "skill_enhancement_upgrade")
 
 -- 2) Gacha RPC
 nk.register_rpc(gacha_service.rpc_gacha_pull, "gacha_pull")

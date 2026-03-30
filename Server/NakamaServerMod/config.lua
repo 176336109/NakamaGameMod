@@ -170,6 +170,55 @@ local function normalize_number_key_table(data)
     return out
 end
 
+local function normalize_skill_item_configs(rows)
+    local by_item = {}
+    local max_level_by_item = {}
+    for _, row in ipairs(rows or {}) do
+        if type(row) == "table" then
+            local item_id = tostring(row.itemId or "")
+            local level = tonumber(row.level)
+            if item_id ~= "" and level ~= nil then
+                local normalized_level = math.floor(level)
+                if normalized_level > 0 then
+                    if type(by_item[item_id]) ~= "table" then
+                        by_item[item_id] = {}
+                    end
+                    by_item[item_id][normalized_level] = row
+                    local current_max = tonumber(max_level_by_item[item_id]) or 0
+                    if normalized_level > current_max then
+                        max_level_by_item[item_id] = normalized_level
+                    end
+                end
+            end
+        end
+    end
+    return by_item, max_level_by_item
+end
+
+local function normalize_skill_upgrade_configs(rows)
+    local by_item = {}
+    for _, row in ipairs(rows or {}) do
+        if type(row) == "table" then
+            local item_id = tostring(row.itemId or "")
+            if item_id ~= "" then
+                local copied = deep_copy(row)
+                copied.upgradeCostsByLevel = {}
+                for _, cost in ipairs(copied.upgradeCosts or {}) do
+                    local level = tonumber(cost and cost.level)
+                    if level ~= nil then
+                        local normalized_level = math.floor(level)
+                        if normalized_level > 0 then
+                            copied.upgradeCostsByLevel[normalized_level] = cost
+                        end
+                    end
+                end
+                by_item[item_id] = copied
+            end
+        end
+    end
+    return by_item
+end
+
 -- NakamaMod/config.lua
 -- 职责：集中存放 Mod 的静态配置数据（道具、抽卡、签到、内购商品、管理端参数等）。
 -- 使用方式：业务模块通过 require("config") 读取本表；本文件不应包含运行时逻辑。
@@ -273,6 +322,22 @@ for pack_id, pack_cfg in pairs(M.gift.packs) do
         }
     end
 end
+
+local skill_item_json = load_json_file("skillEnhancementItemConfigs.json")
+local skill_upgrade_json = load_json_file("skillEnhancementUpgradeConfigs.json")
+if skill_item_json == nil or type(skill_item_json.skillEnhancementItemConfigs) ~= "table" then
+    error("FAILED_TO_LOAD_SKILL_ITEM_CONFIGS_JSON: skillEnhancementItemConfigs.json not found/readable or invalid")
+end
+if skill_upgrade_json == nil or type(skill_upgrade_json.skillEnhancementUpgradeConfigs) ~= "table" then
+    error("FAILED_TO_LOAD_SKILL_UPGRADE_CONFIGS_JSON: skillEnhancementUpgradeConfigs.json not found/readable or invalid")
+end
+M.skill_enhancement_raw = {
+    skillEnhancementItemConfigs = deep_copy(skill_item_json.skillEnhancementItemConfigs),
+    skillEnhancementUpgradeConfigs = deep_copy(skill_upgrade_json.skillEnhancementUpgradeConfigs)
+}
+M.skill_enhancement = deep_copy(M.skill_enhancement_raw)
+M.skill_enhancement_item_configs_by_item_id, M.skill_enhancement_max_level_by_item_id = normalize_skill_item_configs(M.skill_enhancement.skillEnhancementItemConfigs)
+M.skill_enhancement_upgrade_configs_by_item_id = normalize_skill_upgrade_configs(M.skill_enhancement.skillEnhancementUpgradeConfigs)
 
 -- 管理端相关配置
 M.admin = {

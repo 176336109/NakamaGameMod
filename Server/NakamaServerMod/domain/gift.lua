@@ -46,6 +46,59 @@ local function deep_copy(v)
     return out
 end
 
+local function to_id_map_from_list(rows, id_field)
+    local out = {}
+    if type(rows) ~= "table" then
+        return out
+    end
+    for _, row in ipairs(rows) do
+        if type(row) == "table" then
+            local id = row[id_field]
+            if id ~= nil and tostring(id) ~= "" then
+                local copied = deep_copy(row)
+                copied[id_field] = copied[id_field] or id
+                out[tostring(id)] = copied
+            end
+        end
+    end
+    return out
+end
+
+local function to_id_map_from_keyed(src, id_field)
+    local out = {}
+    if type(src) ~= "table" then
+        return out
+    end
+    for key, row in pairs(src) do
+        if type(row) == "table" then
+            local copied = deep_copy(row)
+            if copied[id_field] == nil or tostring(copied[id_field]) == "" then
+                copied[id_field] = key
+            end
+            out[tostring(copied[id_field])] = copied
+        end
+    end
+    return out
+end
+
+local function to_list_from_id_map(src, id_field)
+    local out = {}
+    if type(src) ~= "table" then
+        return out
+    end
+    for key, row in pairs(src) do
+        local copied = type(row) == "table" and deep_copy(row) or {}
+        if copied[id_field] == nil or tostring(copied[id_field]) == "" then
+            copied[id_field] = key
+        end
+        out[#out + 1] = copied
+    end
+    table.sort(out, function(a, b)
+        return tostring(a[id_field] or "") < tostring(b[id_field] or "")
+    end)
+    return out
+end
+
 -- 生成北京时间日期键（YYYYMMDD）。
 local function get_beijing_date_key(ts)
     return os.date("!%Y%m%d", ts + BEIJING_OFFSET_SECONDS)
@@ -81,19 +134,40 @@ local function ensure_state_shape(state)
     if type(state) ~= "table" then
         state = {}
     end
-    if type(state.purchaseStates) ~= "table" then
+    if type(state.purchaseStateList) == "table" then
+        state.purchaseStates = to_id_map_from_list(state.purchaseStateList, "packId")
+    elseif type(state.purchaseStates) == "table" then
+        state.purchaseStates = to_id_map_from_keyed(state.purchaseStates, "packId")
+    else
         state.purchaseStates = {}
     end
-    if type(state.firstRechargeStageStates) ~= "table" then
+    if type(state.firstRechargeStageStateList) == "table" then
+        state.firstRechargeStageStates = to_id_map_from_list(state.firstRechargeStageStateList, "packId")
+    elseif type(state.firstRechargeStageStates) == "table" then
+        state.firstRechargeStageStates = to_id_map_from_keyed(state.firstRechargeStageStates, "packId")
+    else
         state.firstRechargeStageStates = {}
     end
-    if type(state.processedOrders) ~= "table" then
+    if type(state.processedOrderList) == "table" then
+        state.processedOrders = to_id_map_from_list(state.processedOrderList, "orderId")
+    elseif type(state.processedOrders) == "table" then
+        state.processedOrders = to_id_map_from_keyed(state.processedOrders, "orderId")
+    else
         state.processedOrders = {}
     end
     if state.firstRechargeUnlocked ~= true then
         state.firstRechargeUnlocked = false
     end
     return state
+end
+
+local function build_storage_state(state)
+    return {
+        firstRechargeUnlocked = state.firstRechargeUnlocked == true,
+        purchaseStateList = to_list_from_id_map(state.purchaseStates, "packId"),
+        firstRechargeStageStateList = to_list_from_id_map(state.firstRechargeStageStates, "packId"),
+        processedOrderList = to_list_from_id_map(state.processedOrders, "orderId")
+    }
 end
 
 -- 读取礼包状态与版本号。
@@ -117,7 +191,7 @@ local function save_state(user_id, state, version)
         collection = COLLECTION,
         key = KEY_STATE,
         user_id = user_id,
-        value = state,
+        value = build_storage_state(state),
         permission_read = 1,
         permission_write = 0
     }
