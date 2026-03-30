@@ -52,7 +52,15 @@ local ERROR_MAP = {
     VIP_NO_PENDING_REWARD = { code = 900004, message = "无可领取奖励" },
     VIP_EXCEEDS_MAX_CUMULATIVE_DAYS = { code = 900005, message = "超出最大累计天数" },
     VIP_UNSUPPORTED_PLAN_ID = { code = 900006, message = "不支持的会员方案ID" },
-    VIP_INVALID_PLAN_ID = { code = 900007, message = "调试购买参数非法" }
+    VIP_INVALID_PLAN_ID = { code = 900007, message = "调试购买参数非法" },
+    SKILL_ENHANCEMENT_SERVICE_NOT_WIRED = { code = 10000001, message = "内部服务异常" },
+    SKILL_ENHANCEMENT_INVALID_PARAM = { code = 700001, message = "技能强化参数非法" },
+    SKILL_ENHANCEMENT_NOT_FOUND = { code = 700002, message = "技能强化件不存在" },
+    SKILL_ENHANCEMENT_CONFIG_MISSING = { code = 700003, message = "技能强化配置缺失" },
+    SKILL_ENHANCEMENT_FRAGMENT_NOT_ENOUGH = { code = 700004, message = "强化碎片不足" },
+    SKILL_ENHANCEMENT_MAX_LEVEL = { code = 700005, message = "技能强化件已满级" },
+    SKILL_ENHANCEMENT_INVALID_LEVEL = { code = 700006, message = "技能强化等级非法" },
+    SKILL_ENHANCEMENT_UPGRADE_FAILED = { code = 700007, message = "技能强化升级失败" }
 }
 
 -- 获取指定错误键的原始映射项。

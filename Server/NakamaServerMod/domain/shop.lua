@@ -7,6 +7,66 @@ local COLLECTION = "shop"
 local KEY_SNAPSHOT = "special_snapshot"
 local KEY_LIMITS = "limit_state"
 
+local function normalize_limit_state_from_list(rows)
+    local out = {}
+    if type(rows) ~= "table" then
+        return out
+    end
+    for _, row in ipairs(rows) do
+        if type(row) == "table" then
+            local goods_id = row.goodsId
+            if goods_id ~= nil and tostring(goods_id) ~= "" then
+                local copied = {}
+                for k, v in pairs(row) do
+                    copied[k] = v
+                end
+                copied.goodsId = tostring(goods_id)
+                out[copied.goodsId] = copied
+            end
+        end
+    end
+    return out
+end
+
+local function normalize_limit_state_from_keyed(state)
+    local out = {}
+    if type(state) ~= "table" then
+        return out
+    end
+    for key, row in pairs(state) do
+        if type(row) == "table" then
+            local copied = {}
+            for k, v in pairs(row) do
+                copied[k] = v
+            end
+            copied.goodsId = copied.goodsId or tostring(key)
+            out[tostring(copied.goodsId)] = copied
+        end
+    end
+    return out
+end
+
+local function build_limit_state_list(state)
+    local out = {}
+    if type(state) ~= "table" then
+        return out
+    end
+    for key, row in pairs(state) do
+        if type(row) == "table" then
+            local copied = {}
+            for k, v in pairs(row) do
+                copied[k] = v
+            end
+            copied.goodsId = copied.goodsId or tostring(key)
+            out[#out + 1] = copied
+        end
+    end
+    table.sort(out, function(a, b)
+        return tostring(a.goodsId or "") < tostring(b.goodsId or "")
+    end)
+    return out
+end
+
 -- 辅助函数：获取北京时间 YYYYMMDD (UTC+8)
 local function get_beijing_today_str()
     local t = os.time() + 28800 -- UTC+8
@@ -32,18 +92,28 @@ end
 local function load_limit_state(user_id)
     local objects = nk.storage_read({{ collection = COLLECTION, key = KEY_LIMITS, user_id = user_id }})
     if #objects > 0 then
-        return objects[1].value, objects[1].version
+        local value = objects[1].value
+        if type(value) ~= "table" then
+            return {}, objects[1].version
+        end
+        if type(value.limitStateList) == "table" then
+            return normalize_limit_state_from_list(value.limitStateList), objects[1].version
+        end
+        return normalize_limit_state_from_keyed(value), objects[1].version
     end
     return {}, nil
 end
 
 -- 写回用户限购状态。
 local function save_limit_state(user_id, state, version)
+    local value = {
+        limitStateList = build_limit_state_list(state)
+    }
     nk.storage_write({{
         collection = COLLECTION,
         key = KEY_LIMITS,
         user_id = user_id,
-        value = state,
+        value = value,
         version = version,
         permission_read = 1,
         permission_write = 0

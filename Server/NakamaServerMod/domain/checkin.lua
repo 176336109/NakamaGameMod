@@ -6,6 +6,70 @@ local M = {}
 local CHECKIN_COLLECTION = "checkin"
 local CHECKIN_KEY = "checkin"
 
+local function normalize_days_map_from_list(rows)
+    local out = {}
+    if type(rows) ~= "table" then
+        return out
+    end
+    for _, row in ipairs(rows) do
+        if type(row) == "table" then
+            local day_index = tonumber(row.dayIndex)
+            if day_index ~= nil and day_index >= 1 and day_index <= 7 then
+                out[tostring(day_index)] = {
+                    status = row.status,
+                    claimAt = row.claimAt,
+                    claimType = row.claimType
+                }
+            end
+        end
+    end
+    return out
+end
+
+local function normalize_days_map_from_keyed(days)
+    local out = {}
+    if type(days) ~= "table" then
+        return out
+    end
+    for key, row in pairs(days) do
+        if type(row) == "table" then
+            local day_index = tonumber(key) or tonumber(row.dayIndex)
+            if day_index ~= nil and day_index >= 1 and day_index <= 7 then
+                out[tostring(day_index)] = {
+                    status = row.status,
+                    claimAt = row.claimAt,
+                    claimType = row.claimType
+                }
+            end
+        end
+    end
+    return out
+end
+
+local function build_day_claim_list(days)
+    local out = {}
+    if type(days) ~= "table" then
+        return out
+    end
+    for key, row in pairs(days) do
+        if type(row) == "table" then
+            local day_index = tonumber(key) or tonumber(row.dayIndex)
+            if day_index ~= nil and day_index >= 1 and day_index <= 7 then
+                out[#out + 1] = {
+                    dayIndex = day_index,
+                    status = row.status,
+                    claimAt = row.claimAt,
+                    claimType = row.claimType
+                }
+            end
+        end
+    end
+    table.sort(out, function(a, b)
+        return (a.dayIndex or 0) < (b.dayIndex or 0)
+    end)
+    return out
+end
+
 -- Beijing Time (UTC+8) offset in seconds
 local TIME_OFFSET = 8 * 3600
 
@@ -72,6 +136,16 @@ local function load_state(user_id)
     
     if #objects > 0 then
         state = objects[1].value
+        if type(state) ~= "table" then
+            state = {}
+        end
+        if type(state.dayClaimList) == "table" then
+            state.days = normalize_days_map_from_list(state.dayClaimList)
+        elseif type(state.days) == "table" then
+            state.days = normalize_days_map_from_keyed(state.days)
+        else
+            state.days = {}
+        end
         version = objects[1].version
     end
     
@@ -81,11 +155,19 @@ end
 -- Save state to storage
 -- 按 CAS 版本写回签到状态；version 为空时走新写入。
 local function save_state(user_id, state, version)
+    local value = {}
+    if type(state) == "table" then
+        for k, v in pairs(state) do
+            value[k] = v
+        end
+    end
+    value.days = nil
+    value.dayClaimList = build_day_claim_list(state and state.days)
     local write_obj = {
         collection = CHECKIN_COLLECTION,
         key = CHECKIN_KEY,
         user_id = user_id,
-        value = state,
+        value = value,
         permission_read = 1,
         permission_write = 0
     }

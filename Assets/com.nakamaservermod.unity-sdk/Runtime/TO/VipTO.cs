@@ -158,6 +158,7 @@ namespace NakamaServerMod.UnitySdk
         public string key; // 存储键
         public string id; // 物品ID
         public long count; // 数量
+        public long level;
         public string itemType; // 物品类型
         public string itemName; // 物品名
         public string itemDesc; // 物品描述
@@ -258,6 +259,7 @@ namespace NakamaServerMod.UnitySdk
     {
         public string id; // 物品ID
         public long count; // 数量
+        public long level;
         public long expireAt; // 过期时间
         public string benefitPlanId; // 权益计划ID
     }

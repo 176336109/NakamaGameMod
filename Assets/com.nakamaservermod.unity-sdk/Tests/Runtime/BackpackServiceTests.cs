@@ -21,9 +21,9 @@ namespace NakamaServerMod.UnitySdk.Tests
             return client;
         }
 
-        private static BackpackMutationRequest CreateGrantRequest(string id, long count, long expireAt = 0, string requestId = null)
+        private static BackpackMutationRequest CreateGrantRequest(string id, long count, long expireAt = 0, string requestId = null, long level = 1)
         {
-            var item = new BackpackItem { id = id, count = count, expireAt = expireAt };
+            var item = new BackpackItem { id = id, count = count, expireAt = expireAt, level = level };
             return new BackpackMutationRequest
             {
                 source = "sdk_test",
@@ -290,6 +290,7 @@ namespace NakamaServerMod.UnitySdk.Tests
             Assert.IsFalse(string.IsNullOrEmpty(hourglass.itemDesc));
             Assert.IsFalse(hourglass.hasExpireAt);
             Assert.AreEqual(0, hourglass.expireAt);
+            Assert.AreEqual(1, hourglass.level);
 
             var vip = response.backpackItems.First(x => x.id == "item_vip_active");
             Assert.IsTrue(vip.hasExpireAt);
@@ -316,6 +317,7 @@ namespace NakamaServerMod.UnitySdk.Tests
             Assert.IsTrue(response.backpackItems.All(x => !string.IsNullOrEmpty(x.itemDesc)));
             Assert.IsTrue(response.backpackItems.All(x => x.hasExpireAt == false));
             Assert.IsTrue(response.backpackItems.All(x => x.expireAt == 0));
+            Assert.IsTrue(response.backpackItems.All(x => x.level == 1));
         }
 
         // 用例说明：满包时给已有堆叠物品加数量（当前环境跳过）。

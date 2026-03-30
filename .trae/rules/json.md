@@ -31,4 +31,5 @@
 }
 ```
 
- 像这段jso，创建的C#对象中，type应为枚举
+ 像这段jso，创建的C#对象中，type应为枚举，默认Unknown = -1,         All = 0\
+&#x20;存进nakama的json也遵循这规则
