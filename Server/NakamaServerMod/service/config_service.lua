@@ -39,6 +39,16 @@ local function build_data(name)
     if name == "vip" then
         return config.vip
     end
+    if name == "skillEnhancementItemConfigs" then
+        return {
+            skillEnhancementItemConfigs = ((config.skill_enhancement_raw or {}).skillEnhancementItemConfigs) or {}
+        }
+    end
+    if name == "skillEnhancementUpgradeConfigs" then
+        return {
+            skillEnhancementUpgradeConfigs = ((config.skill_enhancement_raw or {}).skillEnhancementUpgradeConfigs) or {}
+        }
+    end
     return nil
 end
 
@@ -49,9 +59,11 @@ function M.rpc_config_get(context, payload)
         gift = build_data("gift"),
         items = build_data("items"),
         shop = build_data("shop"),
-        vip = build_data("vip")
+        vip = build_data("vip"),
+        skillEnhancementItemConfigs = build_data("skillEnhancementItemConfigs"),
+        skillEnhancementUpgradeConfigs = build_data("skillEnhancementUpgradeConfigs")
     }
-    if type(all.checkin) ~= "table" or type(all.gift) ~= "table" or type(all.items) ~= "table" or type(all.shop) ~= "table" or type(all.vip) ~= "table" then
+    if type(all.checkin) ~= "table" or type(all.gift) ~= "table" or type(all.items) ~= "table" or type(all.shop) ~= "table" or type(all.vip) ~= "table" or type(all.skillEnhancementItemConfigs) ~= "table" or type(all.skillEnhancementUpgradeConfigs) ~= "table" then
         return fail_by_key("COMMON_INTERNAL_ERROR", "Config data unavailable")
     end
     local json = nk.json_encode(all)
@@ -60,7 +72,9 @@ function M.rpc_config_get(context, payload)
         gift = nk.json_encode(all.gift),
         items = nk.json_encode(all.items),
         shop = nk.json_encode(all.shop),
-        vip = nk.json_encode(all.vip)
+        vip = nk.json_encode(all.vip),
+        skillEnhancementItemConfigs = nk.json_encode(all.skillEnhancementItemConfigs),
+        skillEnhancementUpgradeConfigs = nk.json_encode(all.skillEnhancementUpgradeConfigs)
     }
     return response.ok({
         name = "all",

@@ -10,6 +10,8 @@ namespace NakamaServerMod.UnitySdk
         public string items;
         public string shop;
         public string vip;
+        public string skillEnhancementItemConfigs;
+        public string skillEnhancementUpgradeConfigs;
     }
 
     [Serializable]
